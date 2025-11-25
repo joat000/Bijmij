@@ -155,10 +155,13 @@
                     <!-- Nearby Friends View -->
                     <div id="friends-nearby-view" class="friends-view active">
                         <div class="location-controls" style="margin-bottom: 20px;">
-                            <button class="location-btn" onclick="findNearbyFriends()">📍 Refresh Nearby
-                                Friends</button>
-                            <p style="margin-top: 10px; color: var(--text-secondary); font-size: 0.9rem;">
-                                Find other users within 50km of your location
+                            <button class="location-btn" onclick="findNearbyFriends(false)">📍 Nearby Friends
+                                (50km)</button>
+                            <button class="location-btn" onclick="findNearbyFriends(true)"
+                                style="background: var(--brutalist-green);">🌍 Worldwide</button>
+                            <p style="margin-top: 10px; color: var(--text-secondary); font-size: 0.9rem;"
+                                id="search-mode-text">
+                                Find users within 50km of your location
                             </p>
                         </div>
 
