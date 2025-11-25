@@ -1,0 +1,26 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+*.db-journal
+.DS_Store
+.env
+.vscode/
+.idea/
+*.log
+
+# Keep uploads folder structure but ignore contents
+uploads/*
+!uploads/.gitkeep
+
+# Keep database structure but don't commit actual database
+database.db
+
+# Cleanup scripts (not needed in production)
+cleanup_project.py
+reset_database_fixed.py

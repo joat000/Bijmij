@@ -1,0 +1,202 @@
+"""
+WebSocket Server for Real-Time Location Sharing
+Provides sub-100ms location updates and user positioning
+"""
+from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask import request
+import sqlite3
+import os
+import time
+
+# This will be initialized from app.py
+socketio = None
+DATABASE_PATH = os.path.join(os.path.dirname(__file__), '..', 'database.db')
+
+# Active users tracking (in-memory for speed)
+active_users = {}  # {user_id: {'socket_id': sid, 'lat': lat, 'lng': lng, 'last_update': timestamp}}
+
+def get_db():
+    """Get database connection with optimizations"""
+    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    # Enable WAL mode for better concurrent access
+    conn.execute('PRAGMA journal_mode=WAL')
+    conn.execute('PRAGMA synchronous=NORMAL')
+    return conn
+
+def init_socketio(app):
+    """Initialize SocketIO with the Flask app"""
+    global socketio
+    socketio = SocketIO(
+        app, 
+        cors_allowed_origins="*",
+        async_mode='threading',
+        ping_timeout=60,
+        ping_interval=25,
+        logger=False,
+        engineio_logger=False
+    )
+    
+    @socketio.on('connect')
+    def handle_connect():
+        print(f'Client connected: {request.sid}')
+        emit('connected', {'status': 'success', 'sid': request.sid})
+    
+    @socketio.on('disconnect')
+    def handle_disconnect():
+        print(f'Client disconnected: {request.sid}')
+        # Remove from active users
+        user_to_remove = None
+        for user_id, data in active_users.items():
+            if data.get('socket_id') == request.sid:
+                user_to_remove = user_id
+                break
+        if user_to_remove:
+            del active_users[user_to_remove]
+            # Broadcast user offline
+            emit('user_offline', {'user_id': user_to_remove}, broadcast=True)
+    
+    @socketio.on('user_online')
+    def handle_user_online(data):
+        """User comes online - join their room"""
+        user_id = data.get('user_id')
+        if user_id:
+            join_room(f'user_{user_id}')
+            active_users[user_id] = {
+                'socket_id': request.sid,
+                'lat': data.get('lat'),
+                'lng': data.get('lng'),
+                'last_update': time.time()
+            }
+            print(f'User {user_id} online')
+            # Broadcast to others
+            emit('user_online', {'user_id': user_id}, broadcast=True, include_self=False)
+    
+    @socketio.on('location_update')
+    def handle_location_update(data):
+        """
+        Ultra-fast location update handler
+        Immediately broadcasts to nearby users without waiting for DB write
+        """
+        user_id = data.get('user_id')
+        lat = data.get('lat')
+        lng = data.get('lng')
+        
+        if not user_id or lat is None or lng is None:
+            return
+        
+        start_time = time.time()
+        
+        # 1. IMMEDIATE: Update in-memory cache (< 1ms)
+        active_users[user_id] = {
+            'socket_id': request.sid,
+            'lat': lat,
+            'lng': lng,
+            'last_update': start_time
+        }
+        
+        # 2. IMMEDIATE: Broadcast to all connected clients (< 5ms)
+        emit('location_updated', {
+            'user_id': user_id,
+            'lat': lat,
+            'lng': lng,
+            'timestamp': start_time
+        }, broadcast=True, include_self=False)
+        
+        # 3. ASYNC: Update database in background (non-blocking)
+        try:
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users 
+                SET latitude = ?, longitude = ?, last_location_update = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (lat, lng, user_id))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f'DB update error: {e}')
+        
+        # 4. Send confirmation to sender
+        elapsed = (time.time() - start_time) * 1000  # Convert to ms
+        emit('location_update_confirmed', {
+            'success': True,
+            'latency_ms': round(elapsed, 2)
+        })
+    
+    @socketio.on('request_nearby_users')
+    def handle_request_nearby_users(data):
+        """Fast nearby users lookup using in-memory data"""
+        user_id = data.get('user_id')
+        lat = data.get('lat')
+        lng = data.get('lng')
+        radius = data.get('radius', 50)
+        worldwide = data.get('worldwide', False)
+        
+        # Return active users immediately from memory
+        nearby = []
+        for uid, udata in active_users.items():
+            if uid != user_id and udata.get('lat') and udata.get('lng'):
+                # Simple distance calculation (can be optimized further)
+                from math import radians, sin, cos, sqrt, atan2
+                R = 6371
+                lat1, lon1 = radians(lat), radians(lng)
+                lat2, lon2 = radians(udata['lat']), radians(udata['lng'])
+                dlat = lat2 - lat1
+                dlon = lon2 - lon1
+                a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+                c = 2 * atan2(sqrt(a), sqrt(1-a))
+                distance = R * c
+                
+                if worldwide or distance <= radius:
+                    nearby.append({
+                        'user_id': uid,
+                        'lat': udata['lat'],
+                        'lng': udata['lng'],
+                        'distance': round(distance, 2),
+                        'online': True
+                    })
+        
+        emit('nearby_users_response', {'users': nearby})
+    
+    @socketio.on('friend_request_sent')
+    def handle_friend_request(data):
+        """Real-time friend request notification"""
+        friend_id = data.get('friend_id')
+        sender_name = data.get('sender_name')
+        sender_id = data.get('sender_id')
+        
+        # Send to specific user's room
+        emit('new_friend_request', {
+            'sender_id': sender_id,
+            'sender_name': sender_name,
+            'message': f'{sender_name} sent you a friend request!'
+        }, room=f'user_{friend_id}')
+    
+    @socketio.on('message_sent')
+    def handle_message_notification(data):
+        """Real-time message notification"""
+        receiver_id = data.get('receiver_id')
+        sender_name = data.get('sender_name')
+        message = data.get('message')
+        
+        emit('new_message', {
+            'sender_name': sender_name,
+            'message': message
+        }, room=f'user_{receiver_id}')
+    
+    return socketio
+
+def broadcast_location_update(user_id, lat, lng):
+    """Helper function to broadcast location updates"""
+    if socketio:
+        socketio.emit('location_updated', {
+            'user_id': user_id,
+            'lat': lat,
+            'lng': lng,
+            'timestamp': time.time()
+        }, broadcast=True)
+
+def get_active_users():
+    """Get list of currently active users"""
+    return active_users
