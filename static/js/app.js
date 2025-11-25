@@ -309,7 +309,7 @@ function switchFriendsTab(tabName) {
     if (tabName === 'chat') loadChatFriends();
 }
 
-async function findNearbyFriends() {
+async function findNearbyFriends(worldwide = false) {
     if (!currentLocation) {
         // Try to get location again
         enableLocation();
@@ -318,13 +318,24 @@ async function findNearbyFriends() {
 
     const grid = document.getElementById('nearby-friends-grid');
     const mapContainer = document.getElementById('friends-map');
+    const modeText = document.getElementById('search-mode-text');
 
-    grid.innerHTML = '<div class="loading">Searching for friends...</div>';
+    // Update search mode text
+    if (worldwide) {
+        grid.innerHTML = '<div class="loading">Searching worldwide...</div>';
+        modeText.textContent = '🌍 Showing ALL users worldwide';
+        modeText.style.color = 'var(--brutalist-green)';
+    } else {
+        grid.innerHTML = '<div class="loading">Searching for friends...</div>';
+        modeText.textContent = 'Find users within 50km of your location';
+        modeText.style.color = 'var(--text-secondary)';
+    }
+
     mapContainer.style.display = 'block';
 
     // Initialize map
     if (!friendsMap) {
-        friendsMap = L.map('friends-map').setView([currentLocation.lat, currentLocation.lng], 13);
+        friendsMap = L.map('friends-map').setView([currentLocation.lat, currentLocation.lng], worldwide ? 2 : 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap contributors'
         }).addTo(friendsMap);
@@ -334,7 +345,7 @@ async function findNearbyFriends() {
             .bindPopup("<b>You are here</b>")
             .openPopup();
     } else {
-        friendsMap.setView([currentLocation.lat, currentLocation.lng], 13);
+        friendsMap.setView([currentLocation.lat, currentLocation.lng], worldwide ? 2 : 13);
     }
 
     // Clear markers
@@ -349,7 +360,8 @@ async function findNearbyFriends() {
                 user_id: currentUser.id,
                 latitude: currentLocation.lat,
                 longitude: currentLocation.lng,
-                radius: 50
+                radius: 50,
+                worldwide: worldwide  // New worldwide flag
             })
         });
 
@@ -357,7 +369,7 @@ async function findNearbyFriends() {
         grid.innerHTML = '';
 
         if (users.length === 0) {
-            grid.innerHTML = '<p class="empty-state">No users found nearby. Invite your friends!</p>';
+            grid.innerHTML = '<p class="empty-state">No users found. Invite your friends!</p>';
             return;
         }
 
