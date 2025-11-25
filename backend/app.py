@@ -1,6 +1,5 @@
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-import sqlite3
 import hashlib
 import os
 import sys
@@ -30,13 +29,11 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 # Ensure upload directories exist
 os.makedirs(os.path.join(UPLOAD_FOLDER, 'users'), exist_ok=True)
 
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), '..', 'database.db')
-
-def get_db():
-    """Get database connection"""
-    conn = sqlite3.connect(DATABASE_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+# Import unified database module (auto-switches between SQLite and PostgreSQL)
+try:
+    from backend.database_unified import get_db, init_db, IntegrityError
+except ImportError:
+    from database_unified import get_db, init_db, IntegrityError
 
 def hash_password(password):
     """Hash password using SHA-256"""
@@ -114,7 +111,7 @@ def register_user():
             ''', (name, email, hash_password(password), photo_url))
             conn.commit()
             user_id = cursor.lastrowid
-        except sqlite3.IntegrityError:
+        except IntegrityError:
             return jsonify({'error': 'Email already registered'}), 409
         finally:
             conn.close()
