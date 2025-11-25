@@ -41,6 +41,10 @@ except ImportError:
         sys.path.append(os.path.dirname(os.path.abspath(__file__)))
         from database_unified import get_db, init_db, IntegrityError
 
+# Initialize database tables on startup
+init_db()
+
+
 def hash_password(password):
     """Hash password using SHA-256"""
     return hashlib.sha256(password.encode()).hexdigest()
