@@ -309,6 +309,14 @@ function switchFriendsTab(tabName) {
     if (tabName === 'chat') loadChatFriends();
 }
 
+// ============ RADIUS CONTROL ============
+
+function updateRadiusDisplay(value) {
+    document.getElementById('radius-value').textContent = value;
+    const modeText = document.getElementById('search-mode-text');
+    modeText.textContent = `Find users within ${value}km of your location`;
+}
+
 async function findNearbyFriends(worldwide = false) {
     if (!currentLocation) {
         // Try to get location again
@@ -370,6 +378,9 @@ async function findNearbyFriends(worldwide = false) {
     friendMarkers = [];
 
     try {
+        // Get selected radius from slider (or default to 50)
+        const selectedRadius = worldwide ? 999999 : (parseInt(document.getElementById('radius-slider')?.value) || 50);
+
         const response = await fetch('/api/friends/nearby', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -377,7 +388,7 @@ async function findNearbyFriends(worldwide = false) {
                 user_id: currentUser.id,
                 latitude: currentLocation.lat,
                 longitude: currentLocation.lng,
-                radius: 50,
+                radius: selectedRadius,
                 worldwide: worldwide
             })
         });
