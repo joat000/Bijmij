@@ -591,11 +591,22 @@ def mark_notification_read(notification_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-if __name__ == '__main__':
-    # Initialize database
-    from database import init_db
+# ============ INITIALIZATION ============
+# Initialize database on startup (works with gunicorn and flask)
+try:
+    from backend.database import init_db
     init_db()
-    
+    print("Database initialized successfully!")
+except ImportError:
+    # Fallback for local development
+    try:
+        from database import init_db
+        init_db()
+        print("Database initialized successfully!")
+    except Exception as e:
+        print(f"Warning: Database initialization failed: {e}")
+
+if __name__ == '__main__':
     print("=" * 60)
     print(" BijMij Social Server Starting... ")
     print("=" * 60)
@@ -605,3 +616,4 @@ if __name__ == '__main__':
     print("=" * 60)
     
     app.run(debug=True, host='0.0.0.0', port=5000)
+
