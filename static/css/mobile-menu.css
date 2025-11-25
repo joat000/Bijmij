@@ -1,0 +1,236 @@
+/* ============================================
+   MOBILE MENU & UI IMPROVEMENTS
+   Add this to the END of style.css
+   ============================================ */
+
+/* Mobile Hamburger Button */
+.mobile-menu-btn {
+    display: none;
+    /* Hidden on desktop */
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 10000;
+    background: var(--text-primary);
+    color: var(--text-inverse);
+    border: var(--border-medium);
+    padding: 12px 16px;
+    cursor: pointer;
+    font-weight: 900;
+    font-size: 1.5rem;
+    box-shadow: 4px 4px 0 var(--text-primary);
+    transition: all 0.2s ease;
+    font-family: 'Courier New', monospace;
+}
+
+.mobile-menu-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--text-primary);
+    background: var(--brutalist-yellow);
+    color: var(--brutalist-black);
+}
+
+/* Mobile Menu Overlay */
+.mobile-menu-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    z-index: 9998;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.mobile-menu-overlay.active {
+    display: block;
+    opacity: 1;
+}
+
+/* Mobile Menu Sidebar */
+.mobile-menu {
+    position: fixed;
+    top: 0;
+    left: -100%;
+    width: 280px;
+    height: 100vh;
+    background: var(--bg-secondary);
+    border-right: var(--border-thick);
+    z-index: 9999;
+    transition: left 0.3s ease;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 8px 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.mobile-menu.active {
+    left: 0;
+}
+
+.mobile-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px;
+    border-bottom: var(--border-medium);
+    background: var(--bg-primary);
+}
+
+.mobile-menu-header h3 {
+    font-size: 1.5rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: var(--text-primary);
+}
+
+.mobile-menu-close {
+    background: transparent;
+    border: none;
+    font-size: 2rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-user-profile {
+    padding: 20px;
+    border-bottom: var(--border-medium);
+    text-align: center;
+    background: var(--bg-primary);
+}
+
+.mobile-user-profile .profile-photo-container {
+    margin: 0 auto 15px;
+}
+
+.mobile-user-info h4 {
+    font-size: 1.1rem;
+    font-weight: 900;
+    margin-bottom: 5px;
+    color: var(--text-primary);
+}
+
+.mobile-user-info p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.mobile-menu-nav {
+    flex: 1;
+    padding: 10px;
+}
+
+.mobile-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 15px;
+    margin-bottom: 5px;
+    background: var(--bg-primary);
+    border: var(--border-thin);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: bold;
+    position: relative;
+}
+
+.mobile-menu-item:hover {
+    background: var(--brutalist-yellow);
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--text-primary);
+}
+
+.mobile-menu-item .menu-icon {
+    font-size: 1.5rem;
+}
+
+.mobile-menu-item .notification-count {
+    position: absolute;
+    right: 15px;
+    background: var(--brutalist-red);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+.mobile-menu-footer {
+    padding: 20px;
+    border-top: var(--border-medium);
+    background: var(--bg-primary);
+}
+
+/* Show mobile menu button on mobile */
+@media (max-width: 768px) {
+    .mobile-menu-btn {
+        display: block;
+    }
+
+    /* Hide desktop sidebar on mobile */
+    .sidebar {
+        display: none;
+    }
+
+    /* Adjust main content for mobile */
+    .main-content {
+        margin-left: 0;
+        width: 100%;
+    }
+
+    /* Adjust dark mode toggle position on mobile */
+    .dark-mode-toggle {
+        top: 20px;
+        right: 20px;
+        left: auto;
+    }
+}
+
+/* Notification Toast Improvements */
+.toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: var(--text-primary);
+    color: var(--text-inverse);
+    padding: 15px 25px;
+    border: var(--border-medium);
+    box-shadow: var(--shadow-brutal);
+    font-weight: bold;
+    font-size: 1rem;
+    z-index: 10001;
+    opacity: 0;
+    transform: translateY(100px);
+    transition: all 0.3s ease;
+    max-width: 300px;
+    font-family: 'Courier New', monospace;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.toast.success {
+    background: var(--brutalist-green);
+    color: var(--brutalist-black);
+}
+
+.toast.error {
+    background: var(--brutalist-red);
+    color: white;
+}
+
+.toast.warning {
+    background: var(--brutalist-yellow);
+    color: var(--brutalist-black);
+}
