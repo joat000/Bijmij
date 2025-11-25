@@ -3,12 +3,21 @@ from flask_cors import CORS
 import sqlite3
 import hashlib
 import os
+import sys
 from datetime import datetime
 import math
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__, static_folder='../static')
 CORS(app)
+
+# Initialize WebSocket support
+try:
+    from backend.websocket_server import init_socketio
+except ImportError:
+    from websocket_server import init_socketio
+    
+socketio = init_socketio(app)
 
 # Configuration
 UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '..', 'uploads')
@@ -614,9 +623,11 @@ if __name__ == '__main__':
     print(" BijMij Social Server Starting... ")
     print("=" * 60)
     print("Server: http://localhost:5000")
+    print("WebSocket: Enabled (Real-time location sharing)")
     print("Upload folders ready:")
     print(f"  - Users: {os.path.join(UPLOAD_FOLDER, 'users')}")
     print("=" * 60)
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Use socketio.run instead of app.run for WebSocket support
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
 
