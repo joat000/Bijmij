@@ -273,8 +273,20 @@
     <!-- Toast Notification -->
     <div id="toast" class="toast"></div>
 
+    <!-- Latency Indicator (Performance Monitor) -->
+    <div id="latency-indicator"
+        style="position: fixed; top: 20px; right: 20px; background: black; color: white; padding: 10px 20px; border: 3px solid var(--brutalist-green); font-weight: bold; display: none; z-index: 10000; font-family: 'Courier New', monospace;">
+        ⚡ 0ms
+    </div>
+
     <!-- Scripts -->
+    <!-- Socket.IO for real-time communication -->
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <!-- Leaflet for maps -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Location Manager (Real-time tracking) -->
+    <script src="/js/location-manager.js"></script>
+    <!-- Main App -->
     <script src="/js/app.js"></script>
 </body>
 
