@@ -155,10 +155,28 @@
                     <!-- Nearby Friends View -->
                     <div id="friends-nearby-view" class="friends-view active">
                         <div class="location-controls" style="margin-bottom: 20px;">
-                            <button class="location-btn" onclick="findNearbyFriends(false)">📍 Nearby Friends
-                                (50km)</button>
+                            <button class="location-btn" onclick="findNearbyFriends(false)">📍 Search Nearby</button>
                             <button class="location-btn" onclick="findNearbyFriends(true)"
                                 style="background: var(--brutalist-green);">🌍 Worldwide</button>
+
+                            <!-- Radius Slider -->
+                            <div id="radius-control"
+                                style="margin-top: 20px; padding: 15px; border: 3px solid var(--text-primary); background: var(--bg-secondary);">
+                                <label style="font-weight: bold; font-size: 1rem; display: block; margin-bottom: 10px;">
+                                    🎯 Search Radius: <span id="radius-value"
+                                        style="color: var(--brutalist-green);">50</span> km
+                                </label>
+                                <input type="range" id="radius-slider" min="5" max="500" value="50" step="5"
+                                    style="width: 100%; height: 8px; background: var(--text-primary); outline: none; cursor: pointer;"
+                                    oninput="updateRadiusDisplay(this.value)" />
+                                <div
+                                    style="display: flex; justify-content: space-between; margin-top: 5px; font-size: 0.8rem; color: var(--text-secondary);">
+                                    <span>5km</span>
+                                    <span>100km</span>
+                                    <span>500km</span>
+                                </div>
+                            </div>
+
                             <p style="margin-top: 10px; color: var(--text-secondary); font-size: 0.9rem;"
                                 id="search-mode-text">
                                 Find users within 50km of your location
