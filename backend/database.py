@@ -15,7 +15,7 @@ def init_db():
     conn = get_db()
     cursor = conn.cursor()
     
-    # Users table (with profile photo)
+    # Users table (with profile photo and location tracking)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,9 +25,23 @@ def init_db():
             profile_photo TEXT,
             latitude REAL,
             longitude REAL,
+            last_location_update TIMESTAMP,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+    
+    # Create indexes for ultra-fast location queries
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_user_location 
+        ON users(latitude, longitude)
+    ''')
+    
+    cursor.execute('''
+        CREATE INDEX IF NOT EXISTS idx_user_last_update 
+        ON users(last_location_update)
+    ''')
+
+
     
     # Notifications table
     cursor.execute('''
