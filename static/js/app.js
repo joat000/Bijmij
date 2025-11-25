@@ -5,6 +5,8 @@ let currentChatFriendId = null;
 let chatPollInterval = null;
 let friendsMap = null;
 let friendMarkers = [];
+let locationManager = null; // Real-time location manager
+let userMarkers = {}; // Track markers by user ID for instant updates
 
 // ============ NAVIGATION ============
 
@@ -245,14 +247,82 @@ async function handlePhotoUpload(input) {
     }
 }
 
-function enableLocation() {
+async function enableLocation() {
     const statusDiv = document.getElementById('location-status');
-    statusDiv.textContent = 'Locating...';
+    statusDiv.textContent = 'Connecting to real-time server...';
 
     if (!navigator.geolocation) {
         statusDiv.textContent = 'Geolocation not supported';
         return;
     }
+
+    try {
+        // Initialize LocationManager if not already done
+        if (!locationManager) {
+            locationManager = new LocationManager();
+        }
+
+        // Connect to WebSocket server
+        await locationManager.connect(currentUser.id);
+        statusDiv.textContent = 'Starting location tracking...';
+
+        // Start continuous location tracking
+        locationManager.startLocationTracking(
+            currentUser.id,
+            (location) => {
+                // Update local state
+                currentLocation = location;
+
+                // Update UI immediately (optimistic update)
+                statusDiv.textContent = `📍 Location Active (±${Math.round(location.accuracy)}m)`;
+                statusDiv.style.color = 'var(--brutalist-green)';
+
+                // Update your marker on map if it exists
+                if (friendsMap && userMarkers['self']) {
+                    userMarkers['self'].setLatLng([location.lat, location.lng]);
+                } else if (friendsMap) {
+                    // Create your marker
+                    const selfMarker = L.marker([location.lat, location.lng], {
+                        icon: L.icon({
+                            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+                            iconSize: [25, 41],
+                            iconAnchor: [12, 41],
+                            popupAnchor: [1, -34],
+                            shadowSize: [41, 41]
+                        })
+                    })
+                        .addTo(friendsMap)
+                        .bindPopup("<b>📍 You are here</b>");
+
+                    userMarkers['self'] = selfMarker;
+                    friendsMap.setView([location.lat, location.lng], 13);
+                }
+
+                // Refresh nearby friends list
+                if (document.getElementById('friends-section').classList.contains('active')) {
+                    findNearbyFriends();
+                }
+            }
+        );
+
+        showToast('Real-time location enabled! 🚀', 'success');
+
+    } catch (error) {
+        console.error('Location tracking error:', error);
+        statusDiv.textContent = 'Location Denied ✗';
+        statusDiv.style.color = 'var(--brutalist-red)';
+        showToast('Please enable location to find friends', 'warning');
+
+        // Fallback to old method
+        enableLocationFallback();
+    }
+}
+
+// Fallback to old location method if WebSocket fails
+function enableLocationFallback() {
+    const statusDiv = document.getElementById('location-status');
+    statusDiv.textContent = 'Locating...';
 
     navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -813,6 +883,118 @@ function loadDarkModePreference() {
         }
     }
 }
+
+// ============ REAL-TIME UPDATES ============
+
+/**
+ * Update user marker on map in real-time
+ */
+window.updateUserMarker = function (userId, lat, lng) {
+    if (!friendsMap) return;
+
+    // Check if marker exists
+    if (userMarkers[userId]) {
+        // Update existing marker position
+        userMarkers[userId].setLatLng([lat, lng]);
+    } else {
+        // Create new marker
+        const marker = L.marker([lat, lng])
+            .addTo(friendsMap)
+            .bindPopup(`<b>User ${userId}</b><br>📍 Live location`);
+
+        userMarkers[userId] = marker;
+        friendMarkers.push(marker);
+    }
+};
+
+/**
+ * Update user card distance in real-time
+ */
+window.updateUserCard = function (userId, lat, lng) {
+    if (!currentLocation) return;
+
+    // Calculate new distance
+    const distance = calculateDistanceClient(
+        currentLocation.lat,
+        currentLocation.lng,
+        lat,
+        lng
+    );
+
+    // Update card if visible
+    const cards = document.querySelectorAll('.business-card');
+    cards.forEach(card => {
+        if (card.dataset.userId == userId) {
+            const distanceEl = card.querySelector('.business-distance');
+            if (distanceEl) {
+                distanceEl.textContent = `📍 ${distance.toFixed(2)} km away`;
+            }
+        }
+    });
+};
+
+/**
+ * Calculate distance on client side (Haversine formula)
+ */
+function calculateDistanceClient(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Earth radius in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+/**
+ * Show latency indicator (for performance monitoring)
+ */
+window.showLatencyIndicator = function (latencyMs) {
+    const indicator = document.getElementById('latency-indicator');
+    if (!indicator) return;
+
+    indicator.textContent = `⚡ ${latencyMs}ms`;
+    indicator.style.display = 'block';
+
+    // Color code based on latency
+    if (latencyMs < 100) {
+        indicator.style.color = 'var(--brutalist-green)';
+    } else if (latencyMs < 300) {
+        indicator.style.color = 'orange';
+    } else {
+        indicator.style.color = 'red';
+    }
+
+    // Hide after 2 seconds
+    setTimeout(() => {
+        indicator.style.display = 'none';
+    }, 2000);
+};
+
+/**
+ * Handle user coming online
+ */
+window.onUserOnline = function (userId) {
+    console.log(`User ${userId} is now online`);
+    // Refresh nearby users if on friends tab
+    if (document.getElementById('friends-section')?.classList.contains('active')) {
+        findNearbyFriends();
+    }
+};
+
+/**
+ * Handle user going offline
+ */
+window.onUserOffline = function (userId) {
+    console.log(`User ${userId} went offline`);
+    // Remove marker if exists
+    if (userMarkers[userId]) {
+        friendsMap.removeLayer(userMarkers[userId]);
+        delete userMarkers[userId];
+    }
+};
 
 // ============ INITIALIZATION ============
 
