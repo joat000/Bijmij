@@ -266,43 +266,70 @@ def get_nearby_users():
         cursor = conn.cursor()
         
         # Get all users except current user
+        # Include users even if they haven't shared location yet
         cursor.execute('''
             SELECT id, name, email, latitude, longitude, profile_photo
             FROM users
-            WHERE id != ? AND latitude IS NOT NULL AND longitude IS NOT NULL
+            WHERE id != ?
         ''', (user_id,))
         
         users = cursor.fetchall()
         nearby_users = []
         
         for user in users:
-            distance = calculate_distance(
-                latitude, longitude,
-                user['latitude'], user['longitude']
-            )
-            
-            # Include user if within radius OR if worldwide search
-            if worldwide or distance <= radius:
-                # Check if already friends or request pending
-                cursor.execute('''
-                    SELECT status FROM friends
-                    WHERE (user_id = ? AND friend_id = ?)
-                       OR (user_id = ? AND friend_id = ?)
-                ''', (user_id, user['id'], user['id'], user_id))
+            # Calculate distance only if both users have location
+            if user['latitude'] and user['longitude'] and latitude and longitude:
+                distance = calculate_distance(
+                    latitude, longitude,
+                    user['latitude'], user['longitude']
+                )
                 
-                friendship = cursor.fetchone()
-                friend_status = friendship['status'] if friendship else None
-                
-                nearby_users.append({
-                    'id': user['id'],
-                    'name': user['name'],
-                    'email': user['email'],
-                    'distance': round(distance, 2),
-                    'profile_photo': user['profile_photo'],
-                    'friend_status': friend_status,
-                    'latitude': user['latitude'],
-                    'longitude': user['longitude']
-                })
+                # Include user if within radius OR if worldwide search
+                if worldwide or distance <= radius:
+                    # Check if already friends or request pending
+                    cursor.execute('''
+                        SELECT status FROM friends
+                        WHERE (user_id = ? AND friend_id = ?)
+                           OR (user_id = ? AND friend_id = ?)
+                    ''', (user_id, user['id'], user['id'], user_id))
+                    
+                    friendship = cursor.fetchone()
+                    friend_status = friendship['status'] if friendship else None
+                    
+                    nearby_users.append({
+                        'id': user['id'],
+                        'name': user['name'],
+                        'email': user['email'],
+                        'distance': round(distance, 2),
+                        'profile_photo': user['profile_photo'],
+                        'friend_status': friend_status,
+                        'latitude': user['latitude'],
+                        'longitude': user['longitude'],
+                        'has_location': True
+                    })
+            else:
+                # User hasn't shared location yet - show them anyway in worldwide mode
+                if worldwide:
+                    cursor.execute('''
+                        SELECT status FROM friends
+                        WHERE (user_id = ? AND friend_id = ?)
+                           OR (user_id = ? AND friend_id = ?)
+                    ''', (user_id, user['id'], user['id'], user_id))
+                    
+                    friendship = cursor.fetchone()
+                    friend_status = friendship['status'] if friendship else None
+                    
+                    nearby_users.append({
+                        'id': user['id'],
+                        'name': user['name'],
+                        'email': user['email'],
+                        'distance': 0,  # Unknown distance
+                        'profile_photo': user['profile_photo'],
+                        'friend_status': friend_status,
+                        'latitude': user['latitude'],
+                        'longitude': user['longitude'],
+                        'has_location': False
+                    })
         
         # Sort by distance
         nearby_users.sort(key=lambda x: x['distance'])
