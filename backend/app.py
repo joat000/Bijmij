@@ -244,13 +244,14 @@ def delete_user(user_id):
 
 @app.route('/api/friends/nearby', methods=['POST'])
 def get_nearby_users():
-    """Get nearby users for friend suggestions"""
+    """Get nearby users for friend suggestions (supports worldwide search)"""
     try:
         data = request.get_json()
         user_id = data.get('user_id')
         latitude = data.get('latitude')
         longitude = data.get('longitude')
-        radius = data.get('radius', 50)  # 50km default
+        radius = data.get('radius', 50)  # 50km default, or 999999 for worldwide
+        worldwide = data.get('worldwide', False)  # New worldwide flag
         
         conn = get_db()
         cursor = conn.cursor()
@@ -271,7 +272,8 @@ def get_nearby_users():
                 user['latitude'], user['longitude']
             )
             
-            if distance <= radius:
+            # Include user if within radius OR if worldwide search
+            if worldwide or distance <= radius:
                 # Check if already friends or request pending
                 cursor.execute('''
                     SELECT status FROM friends
@@ -301,6 +303,7 @@ def get_nearby_users():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/friends/request', methods=['POST'])
 def send_friend_request():
