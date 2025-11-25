@@ -312,6 +312,7 @@ function switchFriendsTab(tabName) {
 async function findNearbyFriends(worldwide = false) {
     if (!currentLocation) {
         // Try to get location again
+        showToast('Please enable location first!', 'warning');
         enableLocation();
         return;
     }
@@ -322,33 +323,49 @@ async function findNearbyFriends(worldwide = false) {
 
     // Update search mode text
     if (worldwide) {
-        grid.innerHTML = '<div class="loading">Searching worldwide...</div>';
+        grid.innerHTML = '<div class="loading">🌍 Searching worldwide...</div>';
         modeText.textContent = '🌍 Showing ALL users worldwide';
         modeText.style.color = 'var(--brutalist-green)';
+        modeText.style.fontWeight = 'bold';
     } else {
-        grid.innerHTML = '<div class="loading">Searching for friends...</div>';
+        grid.innerHTML = '<div class="loading">📍 Searching nearby...</div>';
         modeText.textContent = 'Find users within 50km of your location';
         modeText.style.color = 'var(--text-secondary)';
+        modeText.style.fontWeight = 'normal';
     }
 
     mapContainer.style.display = 'block';
 
-    // Initialize map
+    // Initialize map with appropriate zoom
+    const initialZoom = worldwide ? 2 : 13;
+
     if (!friendsMap) {
-        friendsMap = L.map('friends-map').setView([currentLocation.lat, currentLocation.lng], worldwide ? 2 : 13);
+        friendsMap = L.map('friends-map').setView([currentLocation.lat, currentLocation.lng], initialZoom);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors'
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 18,
+            minZoom: 2
         }).addTo(friendsMap);
 
-        L.marker([currentLocation.lat, currentLocation.lng])
+        // Add your location marker
+        L.marker([currentLocation.lat, currentLocation.lng], {
+            icon: L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+                iconSize: [25, 41],
+                iconAnchor: [12, 41],
+                popupAnchor: [1, -34],
+                shadowSize: [41, 41]
+            })
+        })
             .addTo(friendsMap)
-            .bindPopup("<b>You are here</b>")
+            .bindPopup("<b>📍 You are here</b>")
             .openPopup();
     } else {
-        friendsMap.setView([currentLocation.lat, currentLocation.lng], worldwide ? 2 : 13);
+        friendsMap.setView([currentLocation.lat, currentLocation.lng], initialZoom);
     }
 
-    // Clear markers
+    // Clear previous markers
     friendMarkers.forEach(marker => friendsMap.removeLayer(marker));
     friendMarkers = [];
 
@@ -361,7 +378,7 @@ async function findNearbyFriends(worldwide = false) {
                 latitude: currentLocation.lat,
                 longitude: currentLocation.lng,
                 radius: 50,
-                worldwide: worldwide  // New worldwide flag
+                worldwide: worldwide
             })
         });
 
@@ -369,9 +386,19 @@ async function findNearbyFriends(worldwide = false) {
         grid.innerHTML = '';
 
         if (users.length === 0) {
-            grid.innerHTML = '<p class="empty-state">No users found. Invite your friends!</p>';
+            grid.innerHTML = `<p class="empty-state">${worldwide ? '🌍 No other users found worldwide yet. Be the first!' : '📍 No users found nearby. Try Worldwide mode!'}</p>`;
             return;
         }
+
+        // Show count
+        const countText = worldwide ? `Found ${users.length} users worldwide!` : `Found ${users.length} users nearby`;
+        grid.innerHTML = `<p style="text-align:center; font-weight:bold; margin-bottom:20px; color:var(--brutalist-green);">${countText}</p>`;
+
+        // Store all marker positions for auto-fit
+        const markerBounds = [];
+
+        // Add your position to bounds
+        markerBounds.push([currentLocation.lat, currentLocation.lng]);
 
         users.forEach(user => {
             const card = document.createElement('div');
@@ -382,14 +409,19 @@ async function findNearbyFriends(worldwide = false) {
 
             if (user.friend_status === 'accepted') {
                 actionBtn = `<button class="book-btn" onclick="switchFriendsTab('chat'); startChat(${user.id}, '${user.name}')">💬 CHAT</button>`;
-                mapActionBtn = `<button onclick="switchFriendsTab('chat'); startChat(${user.id}, '${user.name}')" style="background:black; color:white; border:none; padding:5px 10px; cursor:pointer; margin-top:5px;">💬 CHAT</button>`;
+                mapActionBtn = `<button onclick="switchFriendsTab('chat'); startChat(${user.id}, '${user.name}')" style="background:var(--brutalist-green); color:white; border:2px solid black; padding:5px 10px; cursor:pointer; margin-top:5px; font-weight:bold;">💬 CHAT</button>`;
             } else if (user.friend_status === 'pending') {
                 actionBtn = `<button class="book-btn" disabled>🕒 PENDING</button>`;
-                mapActionBtn = `<button disabled style="background:gray; color:white; border:none; padding:5px 10px; margin-top:5px;">🕒 PENDING</button>`;
+                mapActionBtn = `<button disabled style="background:gray; color:white; border:2px solid black; padding:5px 10px; margin-top:5px;">🕒 PENDING</button>`;
             } else {
                 actionBtn = `<button class="book-btn" onclick="sendFriendRequest(${user.id})">➕ ADD FRIEND</button>`;
-                mapActionBtn = `<button onclick="sendFriendRequest(${user.id})" style="background:black; color:white; border:none; padding:5px 10px; cursor:pointer; margin-top:5px;">➕ ADD FRIEND</button>`;
+                mapActionBtn = `<button onclick="sendFriendRequest(${user.id})" style="background:black; color:white; border:2px solid black; padding:5px 10px; cursor:pointer; margin-top:5px; font-weight:bold;">➕ ADD FRIEND</button>`;
             }
+
+            // Distance display with flag for worldwide
+            const distanceDisplay = worldwide && user.distance > 100
+                ? `🌍 ${Math.round(user.distance)} km away`
+                : `📍 ${user.distance} km away`;
 
             card.innerHTML = `
                 <div class="profile-photo-container" style="width: 80px; height: 80px; border-width: 3px;">
@@ -399,7 +431,7 @@ async function findNearbyFriends(worldwide = false) {
                 }
                 </div>
                 <h3 class="business-name" style="text-align: center; font-size: 1.2rem;">${user.name}</h3>
-                <p class="business-distance" style="text-align: center;">${user.distance} km away</p>
+                <p class="business-distance" style="text-align: center; font-weight: bold;">${distanceDisplay}</p>
                 <div style="margin-top: 15px;">
                     ${actionBtn}
                 </div>
@@ -407,12 +439,16 @@ async function findNearbyFriends(worldwide = false) {
             grid.appendChild(card);
 
             if (user.latitude && user.longitude) {
+                // Add to bounds
+                markerBounds.push([user.latitude, user.longitude]);
+
+                // Create marker
                 const marker = L.marker([user.latitude, user.longitude])
                     .addTo(friendsMap)
                     .bindPopup(`
                         <div style="text-align:center; font-family:'Courier New', monospace;">
                             <b>${user.name}</b><br>
-                            ${user.distance} km away<br>
+                            <span style="color: ${worldwide && user.distance > 100 ? 'green' : 'black'}; font-weight: bold;">${distanceDisplay}</span><br>
                             ${mapActionBtn}
                         </div>
                     `);
@@ -420,8 +456,18 @@ async function findNearbyFriends(worldwide = false) {
             }
         });
 
+        // Auto-fit map to show all markers (especially for worldwide)
+        if (worldwide && markerBounds.length > 1) {
+            const bounds = L.latLngBounds(markerBounds);
+            friendsMap.fitBounds(bounds, {
+                padding: [50, 50],
+                maxZoom: 15 // Don't zoom in too much
+            });
+        }
+
     } catch (error) {
         console.error('Error finding friends:', error);
+        grid.innerHTML = '<p class="empty-state">⚠️ Error loading users. Please try again.</p>';
         showToast('Failed to find friends', 'error');
     }
 }
