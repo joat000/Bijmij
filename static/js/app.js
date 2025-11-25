@@ -499,10 +499,15 @@ async function findNearbyFriends(worldwide = false) {
                 mapActionBtn = `<button onclick="sendFriendRequest(${user.id})" style="background:black; color:white; border:2px solid black; padding:5px 10px; cursor:pointer; margin-top:5px; font-weight:bold;">➕ ADD FRIEND</button>`;
             }
 
-            // Distance display with flag for worldwide
-            const distanceDisplay = worldwide && user.distance > 100
-                ? `🌍 ${Math.round(user.distance)} km away`
-                : `📍 ${user.distance} km away`;
+            // Distance display with flag for worldwide and location status
+            let distanceDisplay;
+            if (!user.has_location || user.distance === 0) {
+                distanceDisplay = '📍 Location not shared yet';
+            } else if (worldwide && user.distance > 100) {
+                distanceDisplay = `🌍 ${Math.round(user.distance)} km away`;
+            } else {
+                distanceDisplay = `📍 ${user.distance} km away`;
+            }
 
             card.innerHTML = `
                 <div class="profile-photo-container" style="width: 80px; height: 80px; border-width: 3px;">
@@ -519,7 +524,8 @@ async function findNearbyFriends(worldwide = false) {
             `;
             grid.appendChild(card);
 
-            if (user.latitude && user.longitude) {
+            // Only add map marker if user has location
+            if (user.latitude && user.longitude && user.has_location) {
                 // Add to bounds
                 markerBounds.push([user.latitude, user.longitude]);
 
