@@ -33,7 +33,13 @@ os.makedirs(os.path.join(UPLOAD_FOLDER, 'users'), exist_ok=True)
 try:
     from backend.database_unified import get_db, init_db, IntegrityError
 except ImportError:
-    from database_unified import get_db, init_db, IntegrityError
+    try:
+        from database_unified import get_db, init_db, IntegrityError
+    except ImportError:
+        # Last resort for some Gunicorn configs
+        import sys
+        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        from database_unified import get_db, init_db, IntegrityError
 
 def hash_password(password):
     """Hash password using SHA-256"""
@@ -71,6 +77,15 @@ def static_files(path):
 @app.route('/uploads/<path:filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+@app.route('/admin/download-db-secret-key-123')
+def download_db():
+    """Temporary route to download live database"""
+    try:
+        db_path = os.path.join(os.path.dirname(__file__), '..', 'database.db')
+        return send_from_directory(os.path.dirname(db_path), 'database.db', as_attachment=True)
+    except Exception as e:
+        return str(e)
 
 # ============ USER AUTH ============
 
