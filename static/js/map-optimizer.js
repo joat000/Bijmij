@@ -86,14 +86,14 @@ class MapOptimizer {
             // Add CSS
             const css = document.createElement('link');
             css.rel = 'stylesheet';
-            css.href = 'https://cesium.com/downloads/cesiumjs/releases/1.109/Build/Cesium/Widgets/widgets.css';
+            css.href = 'https://unpkg.com/cesium@1.111.0/Build/Cesium/Widgets/widgets.css';
             document.head.appendChild(css);
 
             // Add JS
             const script = document.createElement('script');
-            script.src = 'https://cesium.com/downloads/cesiumjs/releases/1.109/Build/Cesium/Cesium.js';
+            script.src = 'https://unpkg.com/cesium@1.111.0/Build/Cesium/Cesium.js';
             script.onload = resolve;
-            script.onerror = reject;
+            script.onerror = (e) => reject(new Error('Failed to load CesiumJS: ' + e.message));
             document.head.appendChild(script);
         });
     }
