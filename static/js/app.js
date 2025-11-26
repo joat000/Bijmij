@@ -7,6 +7,7 @@ let friendsMap = null;
 let friendMarkers = [];
 let locationManager = null; // Real-time location manager
 let userMarkers = {}; // Track markers by user ID for instant updates
+let mapOptimizer = null; // Map optimizer for performance and 3D view
 
 // ============ NAVIGATION ============
 
@@ -414,19 +415,19 @@ async function findNearbyFriends(worldwide = false) {
 
     mapContainer.style.display = 'block';
 
+    // Initialize map optimizer if not exists
+    if (!mapOptimizer) {
+        mapOptimizer = new MapOptimizer();
+    }
+
     // Initialize map with appropriate zoom
     const initialZoom = worldwide ? 2 : 13;
 
     if (!friendsMap) {
-        friendsMap = L.map('friends-map').setView([currentLocation.lat, currentLocation.lng], initialZoom);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap contributors',
-            maxZoom: 18,
-            minZoom: 2
-        }).addTo(friendsMap);
+        friendsMap = mapOptimizer.initOptimized2DMap('friends-map', currentLocation.lat, currentLocation.lng, initialZoom);
 
         // Add your location marker
-        L.marker([currentLocation.lat, currentLocation.lng], {
+        mapOptimizer.addMarker(currentLocation.lat, currentLocation.lng, {
             icon: L.icon({
                 iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
                 shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
@@ -434,11 +435,9 @@ async function findNearbyFriends(worldwide = false) {
                 iconAnchor: [12, 41],
                 popupAnchor: [1, -34],
                 shadowSize: [41, 41]
-            })
-        })
-            .addTo(friendsMap)
-            .bindPopup("<b>📍 You are here</b>")
-            .openPopup();
+            }),
+            popup: "<b>📍 You are here</b>"
+        }).openPopup();
     } else {
         friendsMap.setView([currentLocation.lat, currentLocation.lng], initialZoom);
     }
