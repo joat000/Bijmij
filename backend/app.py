@@ -29,17 +29,26 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 # Ensure upload directories exist
 os.makedirs(os.path.join(UPLOAD_FOLDER, 'users'), exist_ok=True)
 
-# Import unified database module (auto-switches between SQLite and PostgreSQL)
+# Import database - use old method for compatibility
+import sqlite3
+
+def get_db():
+    """Get SQLite database connection"""
+    DATABASE_PATH = os.path.join(os.path.dirname(__file__), '..', 'database.db')
+    conn = sqlite3.connect(DATABASE_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+IntegrityError = sqlite3.IntegrityError
+
+# Initialize database
 try:
-    from backend.database_unified import get_db, init_db, IntegrityError
+    from backend.database_unified import init_db
 except ImportError:
     try:
-        from database_unified import get_db, init_db, IntegrityError
+        from database_unified import init_db
     except ImportError:
-        # Last resort for some Gunicorn configs
-        import sys
-        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-        from database_unified import get_db, init_db, IntegrityError
+        pass
 
 # Initialize database tables on startup
 init_db()

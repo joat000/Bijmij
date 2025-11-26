@@ -44,6 +44,9 @@ function goToDashboard() {
     } else {
         findNearbyFriends();
     }
+
+    // Initialize privacy-first chat
+    initializePrivacyChat();
 }
 
 function goToProfile() {
@@ -171,6 +174,17 @@ async function handleUserLogin(e) {
 }
 
 function logout() {
+    // Clean up privacy chat data
+    if (window.localStorage && window.localStorage.db) {
+        window.localStorage.clearAll();
+    }
+
+    // Clear encryption keys
+    if (currentUser) {
+        localStorage.removeItem(`privateKey_${currentUser.id}`);
+        localStorage.removeItem(`publicKey_${currentUser.id}`);
+    }
+
     currentUser = null;
     localStorage.removeItem('currentUser');
     showToast('Logged out successfully', 'success');
@@ -727,19 +741,26 @@ async function loadChatFriends() {
 
 function startChat(friendId, friendName) {
     currentChatFriendId = friendId;
-    document.getElementById('chat-with-name').textContent = friendName;
-    document.getElementById('chat-input').disabled = false;
-    document.getElementById('send-msg-btn').disabled = false;
 
-    document.querySelectorAll('.chat-list-item').forEach(item => {
-        item.classList.remove('active');
-        if (item.textContent.includes(friendName)) item.classList.add('active');
-    });
+    // Use enhanced chat if available
+    if (window.enhancedChat && window.enhancedChat.initialize) {
+        window.enhancedChat.startChat(friendId, friendName);
+    } else {
+        // Fallback to old method
+        document.getElementById('chat-with-name').textContent = friendName;
+        document.getElementById('chat-input').disabled = false;
+        document.getElementById('send-msg-btn').disabled = false;
 
-    loadMessages();
+        document.querySelectorAll('.chat-list-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.textContent.includes(friendName)) item.classList.add('active');
+        });
 
-    if (chatPollInterval) clearInterval(chatPollInterval);
-    chatPollInterval = setInterval(loadMessages, 3000);
+        loadMessages();
+
+        if (chatPollInterval) clearInterval(chatPollInterval);
+        chatPollInterval = setInterval(loadMessages, 3000);
+    }
 }
 
 async function loadMessages() {
@@ -784,6 +805,13 @@ async function loadMessages() {
 }
 
 async function sendMessage() {
+    // Use enhanced chat if available
+    if (window.enhancedChat && window.enhancedChat.currentFriendId) {
+        window.enhancedChat.sendMessage();
+        return;
+    }
+
+    // Fallback to old method
     const input = document.getElementById('chat-input');
     const message = input.value.trim();
 
@@ -1001,6 +1029,37 @@ window.onUserOffline = function (userId) {
     }
 };
 
+// ============ PRIVACY-FIRST CHAT INITIALIZATION ============
+
+async function initializePrivacyChat() {
+    if (!currentUser) return;
+
+    try {
+        console.log('🔐 Initializing privacy-first chat...');
+
+        // 1. Initialize encryption
+        await window.encryption.initialize(currentUser.id);
+        console.log('✅ Encryption initialized');
+
+        // 2. Initialize IndexedDB
+        await window.localStorage.initialize(currentUser.id);
+        console.log('✅ Local storage initialized');
+
+        // 3. Initialize enhanced chat
+        window.enhancedChat.initialize();
+        console.log('✅ Enhanced chat initialized');
+
+        // 4. Voice call manager is ready
+        console.log('✅ Voice call manager ready');
+
+        showToast('🔒 End-to-end encryption enabled', 'success');
+
+    } catch (error) {
+        console.error('Failed to initialize privacy chat:', error);
+        showToast('Warning: Encryption not available', 'error');
+    }
+}
+
 // ============ INITIALIZATION ============
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1014,6 +1073,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Chat enter key
     document.getElementById('chat-input')?.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') sendMessage();
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
     });
 });

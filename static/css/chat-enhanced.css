@@ -1,0 +1,660 @@
+/* ============================================
+   ENHANCED CHAT INTERFACE STYLES
+   Privacy-First Design
+   ============================================ */
+
+/* Chat Container */
+.chat-container {
+    display: flex;
+    height: 600px;
+    border: var(--border-thick);
+    background: var(--bg-primary);
+    box-shadow: var(--shadow-brutal);
+}
+
+.chat-sidebar {
+    width: 300px;
+    border-right: var(--border-thick);
+    background: var(--bg-secondary);
+    overflow-y: auto;
+}
+
+.chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Chat Header */
+.chat-header {
+    padding: 20px;
+    border-bottom: var(--border-thick);
+    background: var(--bg-secondary);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.chat-user-info span:first-child {
+    font-weight: bold;
+    font-size: 1.2rem;
+}
+
+.online-indicator {
+    color: var(--brutalist-green);
+    font-size: 0.9rem;
+}
+
+.offline-indicator {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+
+.chat-header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.voice-call-btn {
+    padding: 10px 20px;
+    background: var(--brutalist-green);
+    color: white;
+    border: 3px solid var(--text-primary);
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.voice-call-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--text-primary);
+}
+
+.encryption-badge {
+    padding: 8px 15px;
+    background: var(--bg-primary);
+    border: 2px solid var(--brutalist-green);
+    color: var(--brutalist-green);
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+/* Chat Messages Area */
+.chat-messages {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    background: var(--bg-primary);
+    scroll-behavior: smooth;
+}
+
+/* Date Separator */
+.date-separator {
+    text-align: center;
+    margin: 20px 0;
+    position: relative;
+}
+
+.date-separator::before,
+.date-separator::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 40%;
+    height: 2px;
+    background: var(--text-secondary);
+}
+
+.date-separator::before {
+    left: 0;
+}
+
+.date-separator::after {
+    right: 0;
+}
+
+.date-separator span {
+    background: var(--bg-primary);
+    padding: 5px 15px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: bold;
+    border: 2px solid var(--text-secondary);
+}
+
+/* Chat Messages */
+.chat-message {
+    margin-bottom: 15px;
+    display: flex;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.chat-message.message-grouped {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message-sent {
+    justify-content: flex-end;
+}
+
+.message-received {
+    justify-content: flex-start;
+}
+
+.message-content {
+    max-width: 70%;
+    padding: 12px 16px;
+    border: 3px solid var(--text-primary);
+    box-shadow: 4px 4px 0 var(--text-primary);
+    position: relative;
+}
+
+.message-sent .message-content {
+    background: var(--text-primary);
+    color: var(--bg-primary);
+}
+
+.message-received .message-content {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+.message-content p {
+    margin: 0;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+.message-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 5px;
+    gap: 10px;
+}
+
+.message-time {
+    font-size: 0.75rem;
+    opacity: 0.7;
+}
+
+/* Read Receipts (Client-Side Only) */
+.read-receipt {
+    font-size: 0.9rem;
+}
+
+.read-receipt.sent {
+    color: var(--text-secondary);
+}
+
+.read-receipt.delivered {
+    color: var(--text-primary);
+}
+
+.read-receipt.read {
+    color: var(--brutalist-blue);
+}
+
+/* Typing Indicator */
+.typing-indicator {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    margin-bottom: 10px;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.typing-dots {
+    display: flex;
+    gap: 4px;
+}
+
+.typing-dots span {
+    width: 8px;
+    height: 8px;
+    background: var(--text-secondary);
+    border-radius: 50%;
+    animation: typing 1.4s infinite;
+}
+
+.typing-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+
+    0%,
+    60%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.5;
+    }
+
+    30% {
+        transform: translateY(-10px);
+        opacity: 1;
+    }
+}
+
+.typing-text {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
+
+/* Chat Input Area */
+.chat-input-area {
+    padding: 20px;
+    border-top: var(--border-thick);
+    background: var(--bg-secondary);
+    display: flex;
+    gap: 10px;
+}
+
+.chat-input-area input,
+.chat-input-area textarea {
+    flex: 1;
+    padding: 15px;
+    border: var(--border-thick);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 1rem;
+    resize: none;
+    min-height: 50px;
+    max-height: 150px;
+}
+
+.chat-input-area button {
+    padding: 15px 30px;
+    background: var(--brutalist-green);
+    color: white;
+    border: 3px solid var(--text-primary);
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.chat-input-area button:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--text-primary);
+}
+
+.chat-input-area button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Chat List */
+.chat-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.chat-list-item {
+    padding: 15px;
+    border-bottom: 2px solid var(--text-primary);
+    cursor: pointer;
+    transition: background 0.2s;
+    position: relative;
+}
+
+.chat-list-item:hover {
+    background: var(--bg-primary);
+}
+
+.chat-list-item.active {
+    background: var(--brutalist-green);
+    color: white;
+}
+
+.chat-list-item-name {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.chat-list-item-preview {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.online-status {
+    font-size: 0.75rem;
+    margin-top: 5px;
+}
+
+.online-status.online {
+    color: var(--brutalist-green);
+}
+
+.online-status.offline {
+    color: var(--text-secondary);
+}
+
+.unread-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: var(--brutalist-red);
+    color: white;
+    padding: 3px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: bold;
+}
+
+/* Empty States */
+.empty-chat-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    text-align: center;
+    padding: 40px;
+}
+
+/* ============================================
+   VOICE CALL MODAL STYLES
+   ============================================ */
+
+.call-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    animation: fadeIn 0.3s ease-in;
+}
+
+.call-modal-content {
+    background: var(--bg-primary);
+    border: var(--border-thick);
+    padding: 40px;
+    text-align: center;
+    min-width: 400px;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.5);
+}
+
+.caller-photo {
+    font-size: 5rem;
+    margin-bottom: 20px;
+}
+
+.caller-photo-large {
+    font-size: 8rem;
+    margin-bottom: 20px;
+}
+
+.call-modal-content h2 {
+    margin: 0 0 10px 0;
+    font-size: 2rem;
+}
+
+.call-modal-content p {
+    color: var(--text-secondary);
+    margin-bottom: 30px;
+}
+
+#call-timer {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--brutalist-green);
+    margin-bottom: 30px;
+}
+
+.call-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.call-btn {
+    padding: 15px 30px;
+    border: 3px solid var(--text-primary);
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.accept-btn {
+    background: var(--brutalist-green);
+    color: white;
+}
+
+.reject-btn {
+    background: var(--brutalist-red);
+    color: white;
+}
+
+.call-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--text-primary);
+}
+
+.call-controls {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.call-control-btn {
+    padding: 15px 25px;
+    background: var(--bg-secondary);
+    border: 3px solid var(--text-primary);
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.call-control-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--text-primary);
+}
+
+.end-call-btn {
+    background: var(--brutalist-red);
+    color: white;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    .chat-container {
+        height: calc(100vh - 100px);
+    }
+
+    .chat-sidebar {
+        display: none;
+    }
+
+    .chat-sidebar.mobile-visible {
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 80%;
+        z-index: 1000;
+        box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .message-content {
+        max-width: 85%;
+    }
+
+    .chat-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .chat-header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .voice-call-btn {
+        padding: 8px 15px;
+        font-size: 0.9rem;
+    }
+
+    .encryption-badge {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+    }
+
+    .call-modal-content {
+        min-width: 90%;
+        padding: 30px 20px;
+    }
+
+    .caller-photo-large {
+        font-size: 6rem;
+    }
+
+    .call-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .call-btn {
+        width: 100%;
+    }
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+.message-loading {
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--bg-secondary);
+    border-top: 4px solid var(--brutalist-green);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+.slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* ============================================
+   SCROLL TO BOTTOM BUTTON
+   ============================================ */
+
+.scroll-to-bottom-btn {
+    position: absolute;
+    bottom: 100px;
+    right: 30px;
+    background: var(--brutalist-green);
+    color: white;
+    border: 3px solid var(--text-primary);
+    padding: 10px 20px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 var(--text-primary);
+    z-index: 100;
+    transition: all 0.2s;
+}
+
+.scroll-to-bottom-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--text-primary);
+}
+
+/* ============================================
+   DARK MODE ADJUSTMENTS
+   ============================================ */
+
+body.dark-mode .message-sent .message-content {
+    background: var(--brutalist-green);
+    color: white;
+}
+
+body.dark-mode .message-received .message-content {
+    background: #2a2a2a;
+    color: white;
+}
+
+body.dark-mode .date-separator span {
+    background: var(--bg-primary);
+}
+
+body.dark-mode .call-modal {
+    background: rgba(0, 0, 0, 0.95);
+}

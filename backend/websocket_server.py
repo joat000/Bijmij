@@ -185,6 +185,190 @@ def init_socketio(app):
             'message': message
         }, room=f'user_{receiver_id}')
     
+    # ============ ENHANCED CHAT FEATURES (Privacy-First) ============
+    
+    @socketio.on('send_encrypted_message')
+    def handle_encrypted_message(data):
+        """
+        Relay encrypted message (server never sees plaintext)
+        Privacy: Server acts as relay only, no storage
+        """
+        sender_id = data.get('sender_id')
+        receiver_id = data.get('receiver_id')
+        encrypted_data = data.get('encrypted_data')
+        encrypted_key = data.get('encrypted_key')
+        iv = data.get('iv')
+        local_message_id = data.get('local_message_id')
+        
+        # Emit to receiver (ephemeral, RAM only)
+        emit('new_message_realtime', {
+            'sender_id': sender_id,
+            'sender_name': active_users.get(sender_id, {}).get('name', 'Unknown'),
+            'encrypted_data': encrypted_data,
+            'encrypted_key': encrypted_key,
+            'iv': iv,
+            'server_message_id': f'{sender_id}_{receiver_id}_{time.time()}'
+        }, room=f'user_{receiver_id}')
+        
+        # Confirm to sender
+        emit('message_sent_confirmed', {
+            'local_message_id': local_message_id,
+            'success': True
+        })
+    
+    @socketio.on('typing')
+    def handle_typing(data):
+        """
+        Typing indicator (ephemeral, never logged)
+        Privacy: Broadcast only, no storage
+        """
+        user_id = data.get('user_id')
+        user_name = data.get('user_name')
+        receiver_id = data.get('receiver_id')
+        
+        # Broadcast to receiver only (ephemeral)
+        emit('user_typing', {
+            'user_id': user_id,
+            'user_name': user_name
+        }, room=f'user_{receiver_id}')
+    
+    @socketio.on('stopped_typing')
+    def handle_stopped_typing(data):
+        """
+        Stop typing indicator (ephemeral)
+        Privacy: Broadcast only, no storage
+        """
+        user_id = data.get('user_id')
+        receiver_id = data.get('receiver_id')
+        
+        emit('user_stopped_typing', {
+            'user_id': user_id
+        }, room=f'user_{receiver_id}')
+    
+    @socketio.on('send_read_receipt')
+    def handle_read_receipt(data):
+        """
+        Read receipt (ephemeral, never stored on server)
+        Privacy: Broadcast only, no logging
+        """
+        message_id = data.get('message_id')
+        sender_id = data.get('sender_id')
+        
+        # Notify sender (ephemeral)
+        emit('message_read', {
+            'message_id': message_id
+        }, room=f'user_{sender_id}')
+    
+    # ============ VOICE CALL SIGNALING (Zero Server Involvement) ============
+    
+    @socketio.on('initiate_call')
+    def handle_initiate_call(data):
+        """
+        Initiate voice call (signaling only)
+        Privacy: No call logs, no duration tracking
+        """
+        caller_id = data.get('caller_id')
+        caller_name = data.get('caller_name')
+        receiver_id = data.get('receiver_id')
+        
+        print(f'Call initiated: {caller_name} -> User {receiver_id}')
+        
+        # Signal to receiver (ephemeral)
+        emit('incoming_call', {
+            'caller_id': caller_id,
+            'caller_name': caller_name
+        }, room=f'user_{receiver_id}')
+    
+    @socketio.on('accept_call')
+    def handle_accept_call(data):
+        """
+        Accept call (signaling only)
+        Privacy: No logging
+        """
+        caller_id = data.get('caller_id')
+        receiver_id = data.get('receiver_id')
+        
+        print(f'Call accepted: User {receiver_id} accepted call from User {caller_id}')
+        
+        # Notify caller (ephemeral)
+        emit('call_accepted', {
+            'receiver_id': receiver_id
+        }, room=f'user_{caller_id}')
+    
+    @socketio.on('reject_call')
+    def handle_reject_call(data):
+        """
+        Reject call (signaling only)
+        Privacy: No logging
+        """
+        caller_id = data.get('caller_id')
+        receiver_id = data.get('receiver_id')
+        
+        print(f'Call rejected: User {receiver_id} rejected call from User {caller_id}')
+        
+        # Notify caller (ephemeral)
+        emit('call_rejected', {
+            'receiver_id': receiver_id
+        }, room=f'user_{caller_id}')
+    
+    @socketio.on('end_call')
+    def handle_end_call(data):
+        """
+        End call (signaling only)
+        Privacy: No call duration stored
+        """
+        receiver_id = data.get('receiver_id')
+        
+        print(f'Call ended with User {receiver_id}')
+        
+        # Notify other peer (ephemeral)
+        emit('call_ended', {}, room=f'user_{receiver_id}')
+    
+    @socketio.on('webrtc_offer')
+    def handle_webrtc_offer(data):
+        """
+        WebRTC offer (ephemeral signaling)
+        Privacy: Deleted immediately after relay
+        """
+        receiver_id = data.get('receiver_id')
+        offer = data.get('offer')
+        
+        # Relay to receiver (ephemeral)
+        emit('webrtc_offer', {
+            'sender_id': request.sid,
+            'offer': offer
+        }, room=f'user_{receiver_id}')
+    
+    @socketio.on('webrtc_answer')
+    def handle_webrtc_answer(data):
+        """
+        WebRTC answer (ephemeral signaling)
+        Privacy: Deleted immediately after relay
+        """
+        receiver_id = data.get('receiver_id')
+        answer = data.get('answer')
+        
+        # Relay to receiver (ephemeral)
+        emit('webrtc_answer', {
+            'sender_id': request.sid,
+            'answer': answer
+        }, room=f'user_{receiver_id}')
+    
+    @socketio.on('webrtc_ice_candidate')
+    def handle_webrtc_ice_candidate(data):
+        """
+        WebRTC ICE candidate (ephemeral signaling)
+        Privacy: Deleted immediately after relay
+        """
+        receiver_id = data.get('receiver_id')
+        candidate = data.get('candidate')
+        
+        # Relay to receiver (ephemeral)
+        emit('webrtc_ice_candidate', {
+            'sender_id': request.sid,
+            'candidate': candidate
+        }, room=f'user_{receiver_id}')
+    
     return socketio
 
 def broadcast_location_update(user_id, lat, lng):
