@@ -45,6 +45,9 @@ function goToDashboard() {
         findNearbyFriends();
     }
 
+    // Connect socket first
+    connectSocket();
+
     // Initialize privacy-first chat
     initializePrivacyChat();
 }
@@ -175,8 +178,8 @@ async function handleUserLogin(e) {
 
 function logout() {
     // Clean up privacy chat data
-    if (window.localStorage && window.localStorage.db) {
-        window.localStorage.clearAll();
+    if (window.chatStorage && window.chatStorage.db) {
+        window.chatStorage.clearAll();
     }
 
     // Clear encryption keys
@@ -1042,15 +1045,16 @@ async function initializePrivacyChat() {
         console.log('✅ Encryption initialized');
 
         // 2. Initialize IndexedDB
-        await window.localStorage.initialize(currentUser.id);
+        await window.chatStorage.initialize(currentUser.id);
         console.log('✅ Local storage initialized');
 
         // 3. Initialize enhanced chat
         window.enhancedChat.initialize();
         console.log('✅ Enhanced chat initialized');
 
-        // 4. Voice call manager is ready
-        console.log('✅ Voice call manager ready');
+        // 4. Initialize voice call manager
+        window.voiceCall.initialize();
+        console.log('✅ Voice call manager initialized');
 
         showToast('🔒 End-to-end encryption enabled', 'success');
 
@@ -1079,3 +1083,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+
+async function connectSocket() {
+    if (!window.socket) {
+        // Initialize LocationManager if not already done
+        if (!locationManager) {
+            locationManager = new LocationManager();
+        }
+        // This will create window.socket if it doesn't exist
+        await locationManager.connect(currentUser.id);
+    }
+}

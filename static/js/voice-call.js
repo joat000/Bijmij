@@ -26,8 +26,14 @@ class VoiceCallManager {
                 { urls: 'stun:stun2.l.google.com:19302' }
             ]
         };
+    }
 
+    /**
+     * Initialize voice call manager
+     */
+    initialize() {
         this.setupSocketListeners();
+        console.log('🎤 Voice call manager initialized');
     }
 
     /**
@@ -175,8 +181,8 @@ class VoiceCallManager {
         this.currentCall = null;
 
         // Save as missed call
-        if (window.localStorage && window.localStorage.db) {
-            window.localStorage.saveCallLog({
+        if (window.chatStorage && window.chatStorage.db) {
+            window.chatStorage.saveCallLog({
                 friendId: this.currentCall.friendId,
                 friendName: this.currentCall.friendName,
                 type: 'missed',
@@ -342,8 +348,8 @@ class VoiceCallManager {
         const duration = this.callStartTime ? Math.floor((Date.now() - this.callStartTime) / 1000) : 0;
 
         // Save call log locally (never sent to server)
-        if (this.currentCall && window.localStorage && window.localStorage.db) {
-            window.localStorage.saveCallLog({
+        if (this.currentCall && window.chatStorage && window.chatStorage.db) {
+            window.chatStorage.saveCallLog({
                 friendId: this.currentCall.friendId,
                 friendName: this.currentCall.friendName,
                 type: this.currentCall.type,

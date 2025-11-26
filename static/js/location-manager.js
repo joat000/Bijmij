@@ -22,13 +22,17 @@ class LocationManager {
     connect(userId) {
         return new Promise((resolve, reject) => {
             try {
-                // Connect to WebSocket server
-                this.socket = io('http://localhost:5000', {
-                    transports: ['websocket', 'polling'],
-                    reconnection: true,
-                    reconnectionDelay: 1000,
-                    reconnectionAttempts: this.MAX_RECONNECT_ATTEMPTS
-                });
+                // Connect to WebSocket server if not already connected
+                if (!window.socket) {
+                    window.socket = io('http://localhost:5000', {
+                        transports: ['websocket', 'polling'],
+                        reconnection: true,
+                        reconnectionDelay: 1000,
+                        reconnectionAttempts: this.MAX_RECONNECT_ATTEMPTS
+                    });
+                }
+
+                this.socket = window.socket;
 
                 this.socket.on('connect', () => {
                     console.log('✅ WebSocket connected');

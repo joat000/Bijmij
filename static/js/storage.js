@@ -384,4 +384,5 @@ class LocalStorage {
 }
 
 // Global instance
-window.localStorage = new LocalStorage();
+// Global instance
+window.chatStorage = new LocalStorage();

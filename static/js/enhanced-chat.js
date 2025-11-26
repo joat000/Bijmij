@@ -156,9 +156,9 @@ class EnhancedChat {
      * Load messages from IndexedDB
      */
     async loadMessages() {
-        if (!window.localStorage || !window.localStorage.db) return;
+        if (!window.chatStorage || !window.chatStorage.db) return;
 
-        const messages = await window.localStorage.getConversation(
+        const messages = await window.chatStorage.getConversation(
             currentUser.id,
             this.currentFriendId
         );
@@ -309,7 +309,7 @@ class EnhancedChat {
             isDelivered: false
         };
 
-        const messageId = await window.localStorage.saveMessage(messageData);
+        const messageId = await window.chatStorage.saveMessage(messageData);
 
         // Render message immediately (optimistic UI)
         this.renderMessage({
@@ -377,7 +377,7 @@ class EnhancedChat {
             isDelivered: true
         };
 
-        const messageId = await window.localStorage.saveMessage(messageData);
+        const messageId = await window.chatStorage.saveMessage(messageData);
 
         // If chat is open with this friend, render message
         if (this.currentFriendId === data.sender_id) {
@@ -500,8 +500,8 @@ class EnhancedChat {
      * Mark message as read
      */
     async markMessageAsRead(messageId) {
-        if (window.localStorage && window.localStorage.db) {
-            await window.localStorage.updateMessageReadStatus(messageId, true);
+        if (window.chatStorage && window.chatStorage.db) {
+            await window.chatStorage.updateMessageReadStatus(messageId, true);
         }
     }
 

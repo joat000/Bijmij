@@ -166,30 +166,31 @@ def register_user():
             return jsonify({'error': 'Missing required fields'}), 400
             
         conn = get_db()
-        cursor = conn.cursor()
-        
-        # Handle photo upload
-        photo_url = None
-        if photo and allowed_file(photo.filename):
-            filename = secure_filename(f"user_reg_{int(datetime.now().timestamp())}.jpg")
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'users', filename)
-            photo.save(filepath)
-            photo_url = f"/uploads/users/{filename}"
-
         try:
-            cursor.execute('''
-                INSERT INTO users (name, email, password_hash, profile_photo)
-                VALUES (?, ?, ?, ?)
-            ''', (name, email, hash_password(password), photo_url))
-            conn.commit()
-            user_id = cursor.lastrowid
-        except IntegrityError:
-            return jsonify({'error': 'Email already registered'}), 409
+            cursor = conn.cursor()
+            
+            # Handle photo upload
+            photo_url = None
+            if photo and allowed_file(photo.filename):
+                filename = secure_filename(f"user_reg_{int(datetime.now().timestamp())}.jpg")
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'users', filename)
+                photo.save(filepath)
+                photo_url = f"/uploads/users/{filename}"
+
+            try:
+                cursor.execute('''
+                    INSERT INTO users (name, email, password_hash, profile_photo)
+                    VALUES (?, ?, ?, ?)
+                ''', (name, email, hash_password(password), photo_url))
+                conn.commit()
+                user_id = cursor.lastrowid
+            except IntegrityError:
+                return jsonify({'error': 'Email already registered'}), 409
+                
+            return jsonify({'message': 'Registration successful', 'user_id': user_id}), 201
         finally:
             conn.close()
             
-        return jsonify({'message': 'Registration successful', 'user_id': user_id}), 201
-        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -201,14 +202,16 @@ def login_user():
         password = data.get('password')
         
         conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT * FROM users WHERE email = ? AND password_hash = ?
-        ''', (email, hash_password(password)))
-        
-        user = cursor.fetchone()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT * FROM users WHERE email = ? AND password_hash = ?
+            ''', (email, hash_password(password)))
+            
+            user = cursor.fetchone()
+        finally:
+            conn.close()
         
         if user:
             return jsonify({
@@ -230,11 +233,13 @@ def login_user():
 def get_user_profile(user_id):
     try:
         conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute('SELECT id, name, email, profile_photo, latitude, longitude FROM users WHERE id = ?', (user_id,))
-        user = cursor.fetchone()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute('SELECT id, name, email, profile_photo, latitude, longitude FROM users WHERE id = ?', (user_id,))
+            user = cursor.fetchone()
+        finally:
+            conn.close()
         
         if user:
             return jsonify(dict(user)), 200
@@ -252,16 +257,18 @@ def update_user_location(user_id):
         longitude = data.get('longitude')
         
         conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            UPDATE users 
-            SET latitude = ?, longitude = ?
-            WHERE id = ?
-        ''', (latitude, longitude, user_id))
-        
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                UPDATE users 
+                SET latitude = ?, longitude = ?
+                WHERE id = ?
+            ''', (latitude, longitude, user_id))
+            
+            conn.commit()
+        finally:
+            conn.close()
         
         return jsonify({'message': 'Location updated'}), 200
         
@@ -286,10 +293,12 @@ def upload_user_photo(user_id):
             photo_url = f"/uploads/users/{filename}"
             
             conn = get_db()
-            cursor = conn.cursor()
-            cursor.execute('UPDATE users SET profile_photo = ? WHERE id = ?', (photo_url, user_id))
-            conn.commit()
-            conn.close()
+            try:
+                cursor = conn.cursor()
+                cursor.execute('UPDATE users SET profile_photo = ? WHERE id = ?', (photo_url, user_id))
+                conn.commit()
+            finally:
+                conn.close()
             
             return jsonify({'message': 'Photo uploaded', 'photo_url': photo_url}), 200
             
@@ -302,16 +311,18 @@ def upload_user_photo(user_id):
 def delete_user(user_id):
     try:
         conn = get_db()
-        cursor = conn.cursor()
-        
-        # Delete related data
-        cursor.execute('DELETE FROM friends WHERE user_id = ? OR friend_id = ?', (user_id, user_id))
-        cursor.execute('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', (user_id, user_id))
-        cursor.execute('DELETE FROM notifications WHERE user_id = ?', (user_id,))
-        cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
-        
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            # Delete related data
+            cursor.execute('DELETE FROM friends WHERE user_id = ? OR friend_id = ?', (user_id, user_id))
+            cursor.execute('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', (user_id, user_id))
+            cursor.execute('DELETE FROM notifications WHERE user_id = ?', (user_id,))
+            cursor.execute('DELETE FROM users WHERE id = ?', (user_id,))
+            
+            conn.commit()
+        finally:
+            conn.close()
         
         return jsonify({'message': 'Account deleted successfully'}), 200
         
@@ -332,78 +343,79 @@ def get_nearby_users():
         worldwide = data.get('worldwide', False)  # New worldwide flag
         
         conn = get_db()
-        cursor = conn.cursor()
-        
-        # Get all users except current user
-        # Include users even if they haven't shared location yet
-        cursor.execute('''
-            SELECT id, name, email, latitude, longitude, profile_photo
-            FROM users
-            WHERE id != ?
-        ''', (user_id,))
-        
-        users = cursor.fetchall()
-        nearby_users = []
-        
-        for user in users:
-            # Calculate distance only if both users have location
-            if user['latitude'] and user['longitude'] and latitude and longitude:
-                distance = calculate_distance(
-                    latitude, longitude,
-                    user['latitude'], user['longitude']
-                )
-                
-                # Include user if within radius OR if worldwide search
-                if worldwide or distance <= radius:
-                    # Check if already friends or request pending
-                    cursor.execute('''
-                        SELECT status FROM friends
-                        WHERE (user_id = ? AND friend_id = ?)
-                           OR (user_id = ? AND friend_id = ?)
-                    ''', (user_id, user['id'], user['id'], user_id))
+        try:
+            cursor = conn.cursor()
+            
+            # Get all users except current user
+            # Include users even if they haven't shared location yet
+            cursor.execute('''
+                SELECT id, name, email, latitude, longitude, profile_photo
+                FROM users
+                WHERE id != ?
+            ''', (user_id,))
+            
+            users = cursor.fetchall()
+            nearby_users = []
+            
+            for user in users:
+                # Calculate distance only if both users have location
+                if user['latitude'] and user['longitude'] and latitude and longitude:
+                    distance = calculate_distance(
+                        latitude, longitude,
+                        user['latitude'], user['longitude']
+                    )
                     
-                    friendship = cursor.fetchone()
-                    friend_status = friendship['status'] if friendship else None
-                    
-                    nearby_users.append({
-                        'id': user['id'],
-                        'name': user['name'],
-                        'email': user['email'],
-                        'distance': round(distance, 2),
-                        'profile_photo': user['profile_photo'],
-                        'friend_status': friend_status,
-                        'latitude': user['latitude'],
-                        'longitude': user['longitude'],
-                        'has_location': True
-                    })
-            else:
-                # User hasn't shared location yet - show them anyway in worldwide mode
-                if worldwide:
-                    cursor.execute('''
-                        SELECT status FROM friends
-                        WHERE (user_id = ? AND friend_id = ?)
-                           OR (user_id = ? AND friend_id = ?)
-                    ''', (user_id, user['id'], user['id'], user_id))
-                    
-                    friendship = cursor.fetchone()
-                    friend_status = friendship['status'] if friendship else None
-                    
-                    nearby_users.append({
-                        'id': user['id'],
-                        'name': user['name'],
-                        'email': user['email'],
-                        'distance': 0,  # Unknown distance
-                        'profile_photo': user['profile_photo'],
-                        'friend_status': friend_status,
-                        'latitude': user['latitude'],
-                        'longitude': user['longitude'],
-                        'has_location': False
-                    })
-        
-        # Sort by distance
-        nearby_users.sort(key=lambda x: x['distance'])
-        
-        conn.close()
+                    # Include user if within radius OR if worldwide search
+                    if worldwide or distance <= radius:
+                        # Check if already friends or request pending
+                        cursor.execute('''
+                            SELECT status FROM friends
+                            WHERE (user_id = ? AND friend_id = ?)
+                               OR (user_id = ? AND friend_id = ?)
+                        ''', (user_id, user['id'], user['id'], user_id))
+                        
+                        friendship = cursor.fetchone()
+                        friend_status = friendship['status'] if friendship else None
+                        
+                        nearby_users.append({
+                            'id': user['id'],
+                            'name': user['name'],
+                            'email': user['email'],
+                            'distance': round(distance, 2),
+                            'profile_photo': user['profile_photo'],
+                            'friend_status': friend_status,
+                            'latitude': user['latitude'],
+                            'longitude': user['longitude'],
+                            'has_location': True
+                        })
+                else:
+                    # User hasn't shared location yet - show them anyway in worldwide mode
+                    if worldwide:
+                        cursor.execute('''
+                            SELECT status FROM friends
+                            WHERE (user_id = ? AND friend_id = ?)
+                               OR (user_id = ? AND friend_id = ?)
+                        ''', (user_id, user['id'], user['id'], user_id))
+                        
+                        friendship = cursor.fetchone()
+                        friend_status = friendship['status'] if friendship else None
+                        
+                        nearby_users.append({
+                            'id': user['id'],
+                            'name': user['name'],
+                            'email': user['email'],
+                            'distance': 0,  # Unknown distance
+                            'profile_photo': user['profile_photo'],
+                            'friend_status': friend_status,
+                            'latitude': user['latitude'],
+                            'longitude': user['longitude'],
+                            'has_location': False
+                        })
+            
+            # Sort by distance
+            nearby_users.sort(key=lambda x: x['distance'])
+        finally:
+            conn.close()
         return jsonify(nearby_users), 200
         
     except Exception as e:
@@ -419,38 +431,40 @@ def send_friend_request():
         friend_id = data.get('friend_id')
         
         conn = get_db()
-        cursor = conn.cursor()
-        
-        # Check if request already exists
-        cursor.execute('''
-            SELECT * FROM friends
-            WHERE (user_id = ? AND friend_id = ?)
-               OR (user_id = ? AND friend_id = ?)
-        ''', (user_id, friend_id, friend_id, user_id))
-        
-        existing = cursor.fetchone()
-        if existing:
-            return jsonify({'error': 'Friend request already exists'}), 400
-        
-        # Create friend request
-        cursor.execute('''
-            INSERT INTO friends (user_id, friend_id, status)
-            VALUES (?, ?, 'pending')
-        ''', (user_id, friend_id))
-        
-        # Create notification for friend
-        cursor.execute('''
-            SELECT name FROM users WHERE id = ?
-        ''', (user_id,))
-        sender = cursor.fetchone()
-        
-        cursor.execute('''
-            INSERT INTO notifications (user_id, message, type)
-            VALUES (?, ?, 'friend_request')
-        ''', (friend_id, f"{sender['name']} sent you a friend request!"))
-        
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            # Check if request already exists
+            cursor.execute('''
+                SELECT * FROM friends
+                WHERE (user_id = ? AND friend_id = ?)
+                   OR (user_id = ? AND friend_id = ?)
+            ''', (user_id, friend_id, friend_id, user_id))
+            
+            existing = cursor.fetchone()
+            if existing:
+                return jsonify({'error': 'Friend request already exists'}), 400
+            
+            # Create friend request
+            cursor.execute('''
+                INSERT INTO friends (user_id, friend_id, status)
+                VALUES (?, ?, 'pending')
+            ''', (user_id, friend_id))
+            
+            # Create notification for friend
+            cursor.execute('''
+                SELECT name FROM users WHERE id = ?
+            ''', (user_id,))
+            sender = cursor.fetchone()
+            
+            cursor.execute('''
+                INSERT INTO notifications (user_id, message, type)
+                VALUES (?, ?, 'friend_request')
+            ''', (friend_id, f"{sender['name']} sent you a friend request!"))
+            
+            conn.commit()
+        finally:
+            conn.close()
         
         return jsonify({'message': 'Friend request sent'}), 201
         
@@ -466,28 +480,30 @@ def accept_friend_request():
         friend_id = data.get('friend_id')
         
         conn = get_db()
-        cursor = conn.cursor()
-        
-        # Update status to accepted
-        cursor.execute('''
-            UPDATE friends
-            SET status = 'accepted'
-            WHERE user_id = ? AND friend_id = ?
-        ''', (friend_id, user_id))
-        
-        # Create notification
-        cursor.execute('''
-            SELECT name FROM users WHERE id = ?
-        ''', (user_id,))
-        accepter = cursor.fetchone()
-        
-        cursor.execute('''
-            INSERT INTO notifications (user_id, message, type)
-            VALUES (?, ?, 'friend_accepted')
-        ''', (friend_id, f"{accepter['name']} accepted your friend request!"))
-        
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            # Update status to accepted
+            cursor.execute('''
+                UPDATE friends
+                SET status = 'accepted'
+                WHERE user_id = ? AND friend_id = ?
+            ''', (friend_id, user_id))
+            
+            # Create notification
+            cursor.execute('''
+                SELECT name FROM users WHERE id = ?
+            ''', (user_id,))
+            accepter = cursor.fetchone()
+            
+            cursor.execute('''
+                INSERT INTO notifications (user_id, message, type)
+                VALUES (?, ?, 'friend_accepted')
+            ''', (friend_id, f"{accepter['name']} accepted your friend request!"))
+            
+            conn.commit()
+        finally:
+            conn.close()
         
         return jsonify({'message': 'Friend request accepted'}), 200
         
@@ -498,22 +514,25 @@ def accept_friend_request():
 def get_friends_list(user_id):
     """Get user's friends list"""
     try:
+    try:
         conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT u.id, u.name, u.email, u.profile_photo, f.status
-            FROM friends f
-            JOIN users u ON (
-                (f.user_id = ? AND f.friend_id = u.id) OR
-                (f.friend_id = ? AND f.user_id = u.id)
-            )
-            WHERE (f.user_id = ? OR f.friend_id = ?)
-              AND f.status = 'accepted'
-        ''', (user_id, user_id, user_id, user_id))
-        
-        friends = [dict(row) for row in cursor.fetchall()]
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT u.id, u.name, u.email, u.profile_photo, f.status
+                FROM friends f
+                JOIN users u ON (
+                    (f.user_id = ? AND f.friend_id = u.id) OR
+                    (f.friend_id = ? AND f.user_id = u.id)
+                )
+                WHERE (f.user_id = ? OR f.friend_id = ?)
+                  AND f.status = 'accepted'
+            ''', (user_id, user_id, user_id, user_id))
+            
+            friends = [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
         
         return jsonify(friends), 200
         
@@ -524,19 +543,22 @@ def get_friends_list(user_id):
 def get_friend_requests(user_id):
     """Get pending friend requests"""
     try:
+    try:
         conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT u.id, u.name, u.email, u.profile_photo, f.created_at, f.id as request_id
-            FROM friends f
-            JOIN users u ON f.user_id = u.id
-            WHERE f.friend_id = ? AND f.status = 'pending'
-            ORDER BY f.created_at DESC
-        ''', (user_id,))
-        
-        requests = [dict(row) for row in cursor.fetchall()]
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT u.id, u.name, u.email, u.profile_photo, f.created_at, f.id as request_id
+                FROM friends f
+                JOIN users u ON f.user_id = u.id
+                WHERE f.friend_id = ? AND f.status = 'pending'
+                ORDER BY f.created_at DESC
+            ''', (user_id,))
+            
+            requests = [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
         
         return jsonify(requests), 200
         
@@ -558,39 +580,41 @@ def send_message():
             return jsonify({'error': 'Message cannot be empty'}), 400
         
         conn = get_db()
-        cursor = conn.cursor()
-        
-        # Verify they are friends
-        cursor.execute('''
-            SELECT * FROM friends
-            WHERE ((user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?))
-              AND status = 'accepted'
-        ''', (sender_id, receiver_id, receiver_id, sender_id))
-        
-        if not cursor.fetchone():
-            return jsonify({'error': 'You can only message friends'}), 403
-        
-        # Send message
-        cursor.execute('''
-            INSERT INTO messages (sender_id, receiver_id, message)
-            VALUES (?, ?, ?)
-        ''', (sender_id, receiver_id, message))
-        
-        message_id = cursor.lastrowid
-        
-        # Create notification
-        cursor.execute('''
-            SELECT name FROM users WHERE id = ?
-        ''', (sender_id,))
-        sender = cursor.fetchone()
-        
-        cursor.execute('''
-            INSERT INTO notifications (user_id, message, type)
-            VALUES (?, ?, 'new_message')
-        ''', (receiver_id, f"New message from {sender['name']}"))
-        
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            # Verify they are friends
+            cursor.execute('''
+                SELECT * FROM friends
+                WHERE ((user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?))
+                  AND status = 'accepted'
+            ''', (sender_id, receiver_id, receiver_id, sender_id))
+            
+            if not cursor.fetchone():
+                return jsonify({'error': 'You can only message friends'}), 403
+            
+            # Send message
+            cursor.execute('''
+                INSERT INTO messages (sender_id, receiver_id, message)
+                VALUES (?, ?, ?)
+            ''', (sender_id, receiver_id, message))
+            
+            message_id = cursor.lastrowid
+            
+            # Create notification
+            cursor.execute('''
+                SELECT name FROM users WHERE id = ?
+            ''', (sender_id,))
+            sender = cursor.fetchone()
+            
+            cursor.execute('''
+                INSERT INTO notifications (user_id, message, type)
+                VALUES (?, ?, 'new_message')
+            ''', (receiver_id, f"New message from {sender['name']}"))
+            
+            conn.commit()
+        finally:
+            conn.close()
         
         return jsonify({
             'message': 'Message sent',
@@ -609,31 +633,33 @@ def get_conversation():
         friend_id = data.get('friend_id')
         
         conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT m.*, 
-                   sender.name as sender_name,
-                   receiver.name as receiver_name
-            FROM messages m
-            JOIN users sender ON m.sender_id = sender.id
-            JOIN users receiver ON m.receiver_id = receiver.id
-            WHERE (m.sender_id = ? AND m.receiver_id = ?)
-               OR (m.sender_id = ? AND m.receiver_id = ?)
-            ORDER BY m.created_at ASC
-        ''', (user_id, friend_id, friend_id, user_id))
-        
-        messages = [dict(row) for row in cursor.fetchall()]
-        
-        # Mark messages as read
-        cursor.execute('''
-            UPDATE messages
-            SET is_read = 1
-            WHERE sender_id = ? AND receiver_id = ? AND is_read = 0
-        ''', (friend_id, user_id))
-        
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT m.*, 
+                       sender.name as sender_name,
+                       receiver.name as receiver_name
+                FROM messages m
+                JOIN users sender ON m.sender_id = sender.id
+                JOIN users receiver ON m.receiver_id = receiver.id
+                WHERE (m.sender_id = ? AND m.receiver_id = ?)
+                   OR (m.sender_id = ? AND m.receiver_id = ?)
+                ORDER BY m.created_at ASC
+            ''', (user_id, friend_id, friend_id, user_id))
+            
+            messages = [dict(row) for row in cursor.fetchall()]
+            
+            # Mark messages as read
+            cursor.execute('''
+                UPDATE messages
+                SET is_read = 1
+                WHERE sender_id = ? AND receiver_id = ? AND is_read = 0
+            ''', (friend_id, user_id))
+            
+            conn.commit()
+        finally:
+            conn.close()
         
         return jsonify(messages), 200
         
@@ -644,17 +670,20 @@ def get_conversation():
 def get_unread_count(user_id):
     """Get unread message count"""
     try:
+    try:
         conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT COUNT(*) as count
-            FROM messages
-            WHERE receiver_id = ? AND is_read = 0
-        ''', (user_id,))
-        
-        result = cursor.fetchone()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT COUNT(*) as count
+                FROM messages
+                WHERE receiver_id = ? AND is_read = 0
+            ''', (user_id,))
+            
+            result = cursor.fetchone()
+        finally:
+            conn.close()
         
         return jsonify({'unread_count': result['count']}), 200
         
@@ -666,18 +695,21 @@ def get_unread_count(user_id):
 @app.route('/api/notifications/<int:user_id>', methods=['GET'])
 def get_notifications(user_id):
     try:
+    try:
         conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT * FROM notifications 
-            WHERE user_id = ? 
-            ORDER BY created_at DESC 
-            LIMIT 50
-        ''', (user_id,))
-        
-        notifications = [dict(row) for row in cursor.fetchall()]
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT * FROM notifications 
+                WHERE user_id = ? 
+                ORDER BY created_at DESC 
+                LIMIT 50
+            ''', (user_id,))
+            
+            notifications = [dict(row) for row in cursor.fetchall()]
+        finally:
+            conn.close()
         
         return jsonify(notifications), 200
         
@@ -687,12 +719,15 @@ def get_notifications(user_id):
 @app.route('/api/notifications/mark-read/<int:notification_id>', methods=['POST'])
 def mark_notification_read(notification_id):
     try:
+    try:
         conn = get_db()
-        cursor = conn.cursor()
-        
-        cursor.execute('UPDATE notifications SET is_read = 1 WHERE id = ?', (notification_id,))
-        conn.commit()
-        conn.close()
+        try:
+            cursor = conn.cursor()
+            
+            cursor.execute('UPDATE notifications SET is_read = 1 WHERE id = ?', (notification_id,))
+            conn.commit()
+        finally:
+            conn.close()
         
         return jsonify({'message': 'Marked as read'}), 200
         
