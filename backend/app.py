@@ -514,7 +514,7 @@ def accept_friend_request():
 def get_friends_list(user_id):
     """Get user's friends list"""
     try:
-    try:
+
         conn = get_db()
         try:
             cursor = conn.cursor()
@@ -543,7 +543,7 @@ def get_friends_list(user_id):
 def get_friend_requests(user_id):
     """Get pending friend requests"""
     try:
-    try:
+
         conn = get_db()
         try:
             cursor = conn.cursor()
@@ -670,7 +670,7 @@ def get_conversation():
 def get_unread_count(user_id):
     """Get unread message count"""
     try:
-    try:
+
         conn = get_db()
         try:
             cursor = conn.cursor()
@@ -695,7 +695,7 @@ def get_unread_count(user_id):
 @app.route('/api/notifications/<int:user_id>', methods=['GET'])
 def get_notifications(user_id):
     try:
-    try:
+
         conn = get_db()
         try:
             cursor = conn.cursor()
@@ -719,7 +719,7 @@ def get_notifications(user_id):
 @app.route('/api/notifications/mark-read/<int:notification_id>', methods=['POST'])
 def mark_notification_read(notification_id):
     try:
-    try:
+
         conn = get_db()
         try:
             cursor = conn.cursor()

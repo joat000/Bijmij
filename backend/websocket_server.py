@@ -1,16 +1,3 @@
-"""
-WebSocket Server for Real-Time Location Sharing
-Provides sub-100ms location updates and user positioning
-"""
-from flask_socketio import SocketIO, emit, join_room, leave_room
-from flask import request
-import sqlite3
-import os
-import time
-
-# This will be initialized from app.py
-socketio = None
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), '..', 'database.db')
 
 # Active users tracking (in-memory for speed)
 active_users = {}  # {user_id: {'socket_id': sid, 'lat': lat, 'lng': lng, 'last_update': timestamp}}
@@ -114,6 +101,9 @@ def init_socketio(app):
             ''', (lat, lng, user_id))
             conn.commit()
             conn.close()
+            
+            # Update streak
+            update_streak(user_id)
         except Exception as e:
             print(f'DB update error: {e}')
         
@@ -369,6 +359,74 @@ def init_socketio(app):
             'candidate': candidate
         }, room=f'user_{receiver_id}')
     
+    @socketio.on('message_delivered')
+    def handle_message_delivered(data):
+        """
+        Message delivered receipt (ephemeral)
+        Privacy: Broadcast only, no logging
+        """
+        message_id = data.get('message_id')
+        sender_id = data.get('sender_id')
+        
+        # Notify sender (ephemeral)
+        emit('message_delivered', {
+            'message_id': message_id
+        }, room=f'user_{sender_id}')
+
+    @socketio.on('send_image_chunk')
+    def handle_image_chunk(data):
+        """
+        Handle image transfer in chunks (for privacy and speed)
+        Relays chunks directly to receiver without storage
+        """
+        receiver_id = data.get('receiver_id')
+        chunk = data.get('chunk')
+        chunk_index = data.get('chunk_index')
+        total_chunks = data.get('total_chunks')
+        transfer_id = data.get('transfer_id')
+        sender_id = data.get('sender_id')
+        
+        emit('receive_image_chunk', {
+            'sender_id': sender_id,
+            'chunk': chunk,
+            'chunk_index': chunk_index,
+            'total_chunks': total_chunks,
+            'transfer_id': transfer_id
+        }, room=f'user_{receiver_id}')
+
+    @socketio.on('send_wave')
+    def handle_wave(data):
+        """
+        Send a "Wave" to another user
+        """
+        sender_id = data.get('sender_id')
+        sender_name = data.get('sender_name')
+        receiver_id = data.get('receiver_id')
+        
+        emit('receive_wave', {
+            'sender_id': sender_id,
+            'sender_name': sender_name,
+            'message': f"👋 {sender_name} waved at you!"
+        }, room=f'user_{receiver_id}')
+        
+        # Confirm to sender
+        emit('wave_sent', {'success': True, 'receiver_id': receiver_id})
+
+    @socketio.on('send_ping')
+    def handle_ping(data):
+        """
+        Send a "Ping" (attention grabber)
+        """
+        sender_id = data.get('sender_id')
+        sender_name = data.get('sender_name')
+        receiver_id = data.get('receiver_id')
+        
+        emit('receive_ping', {
+            'sender_id': sender_id,
+            'sender_name': sender_name,
+            'message': f"🔔 {sender_name} pinged you!"
+        }, room=f'user_{receiver_id}')
+
     return socketio
 
 def broadcast_location_update(user_id, lat, lng):

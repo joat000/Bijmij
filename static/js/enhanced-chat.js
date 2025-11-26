@@ -71,6 +71,11 @@ class EnhancedChat {
         socket.on('new_message_realtime', async (data) => {
             await this.handleIncomingMessage(data);
         });
+
+        // Image chunks
+        socket.on('receive_image_chunk', async (data) => {
+            await this.handleImageChunk(data);
+        });
     }
 
     /**
@@ -98,6 +103,16 @@ class EnhancedChat {
             chatInput.style.height = 'auto';
             chatInput.style.height = Math.min(chatInput.scrollHeight, 150) + 'px';
         });
+
+        // Image input
+        const imageInput = document.getElementById('chat-image-input');
+        if (imageInput) {
+            imageInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    this.handleImageSelection(e.target.files[0]);
+                }
+            });
+        }
     }
 
     /**
@@ -254,9 +269,17 @@ class EnhancedChat {
         const messageEl = document.createElement('div');
         messageEl.className = `chat-message ${messageClass} ${groupedClass}`;
         messageEl.dataset.messageId = msg.id;
+
+        let contentHtml = `<p>${this.escapeHtml(msg.message)}</p>`;
+
+        // Check if message is an image
+        if (msg.message.startsWith('data:image')) {
+            contentHtml = `<img src="${msg.message}" class="chat-image" onclick="window.open(this.src)" style="max-width: 200px; border-radius: 10px; cursor: pointer;">`;
+        }
+
         messageEl.innerHTML = `
             <div class="message-content">
-                <p>${this.escapeHtml(msg.message)}</p>
+                ${contentHtml}
                 <div class="message-meta">
                     <span class="message-time">${this.formatTime(msg.timestamp)}</span>
                     ${readReceipt}
@@ -631,8 +654,172 @@ class EnhancedChat {
     }
 
     /**
-     * Escape HTML
+     * Handle image selection
      */
+    async handleImageSelection(file) {
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            showToast('Image too large (max 5MB)', 'error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const imageData = e.target.result;
+            await this.sendImage(imageData);
+        };
+        reader.readAsDataURL(file);
+    }
+
+    /**
+     * Send image message
+     */
+    async sendImage(imageData) {
+        // 1. Save locally and render
+        const messageData = {
+            userId: currentUser.id,
+            friendId: this.currentFriendId,
+            senderId: currentUser.id,
+            receiverId: this.currentFriendId,
+            message: imageData, // Store base64 image
+            timestamp: Date.now(),
+            isRead: false,
+            isSent: false,
+            isDelivered: false
+        };
+
+        const messageId = await window.chatStorage.saveMessage(messageData);
+
+        this.renderMessage({
+            id: messageId,
+            senderId: currentUser.id,
+            message: imageData,
+            timestamp: Date.now(),
+            isRead: false,
+            isSent: false,
+            isDelivered: false,
+            grouped: false
+        });
+        this.scrollToBottom();
+
+        // 2. Chunk and send
+        const CHUNK_SIZE = 100 * 1024; // 100KB chunks
+        const totalChunks = Math.ceil(imageData.length / CHUNK_SIZE);
+        const transferId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+        for (let i = 0; i < totalChunks; i++) {
+            const chunk = imageData.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+            socket.emit('send_image_chunk', {
+                receiver_id: this.currentFriendId,
+                sender_id: currentUser.id,
+                chunk: chunk,
+                chunk_index: i,
+                total_chunks: totalChunks,
+                transfer_id: transferId
+            });
+        }
+    }
+
+    /**
+     * Handle incoming image chunk
+     */
+    async handleImageChunk(data) {
+        if (!this.imageTransfers) this.imageTransfers = {};
+
+        if (!this.imageTransfers[data.transfer_id]) {
+            this.imageTransfers[data.transfer_id] = {
+                chunks: [],
+                count: 0,
+                total: data.total_chunks,
+                sender_id: data.sender_id
+            };
+        }
+
+        const transfer = this.imageTransfers[data.transfer_id];
+        transfer.chunks[data.chunk_index] = data.chunk;
+        transfer.count++;
+
+        if (transfer.count === transfer.total) {
+            // All chunks received
+            const fullImage = transfer.chunks.join('');
+            delete this.imageTransfers[data.transfer_id];
+
+            // Process as a normal message
+            await this.handleIncomingMessage({
+                sender_id: transfer.sender_id,
+                sender_name: this.currentFriendName || 'Friend', // Fallback
+                encrypted_data: null, // Not encrypted in this simple implementation
+                message: fullImage // Pass directly if not encrypted
+            }, true); // isImage flag
+        }
+    }
+
+    /**
+     * Override handleIncomingMessage to support direct image data
+     */
+    async handleIncomingMessage(data, isImage = false) {
+        let messageText = '[Encrypted message]';
+
+        if (isImage) {
+            messageText = data.message;
+        } else if (data.encrypted_data && window.encryption) {
+            try {
+                messageText = await window.encryption.decryptMessage({
+                    encrypted_data: data.encrypted_data,
+                    encrypted_key: data.encrypted_key,
+                    iv: data.iv
+                });
+            } catch (error) {
+                console.error('Failed to decrypt message:', error);
+            }
+        }
+
+        // Save to IndexedDB
+        const messageData = {
+            userId: currentUser.id,
+            friendId: data.sender_id,
+            senderId: data.sender_id,
+            receiverId: currentUser.id,
+            message: messageText,
+            timestamp: Date.now(),
+            isRead: false,
+            isSent: true,
+            isDelivered: true
+        };
+
+        const messageId = await window.chatStorage.saveMessage(messageData);
+
+        // If chat is open with this friend, render message
+        if (this.currentFriendId === data.sender_id) {
+            this.renderMessage({
+                id: messageId,
+                senderId: data.sender_id,
+                message: messageText,
+                timestamp: Date.now(),
+                isRead: false,
+                isSent: true,
+                isDelivered: true,
+                grouped: false
+            });
+
+            this.scrollToBottom();
+            this.markMessageAsRead(messageId);
+
+            if (!isImage) { // Don't send read receipt for image chunks logic yet
+                socket.emit('send_read_receipt', {
+                    message_id: data.server_message_id,
+                    sender_id: data.sender_id
+                });
+            }
+        } else {
+            this.unreadMessages[data.sender_id] = (this.unreadMessages[data.sender_id] || 0) + 1;
+            this.updateChatListUnread(data.sender_id);
+        }
+
+        const audio = document.getElementById('notification-sound');
+        if (audio) audio.play();
+        showToast(`New message from ${data.sender_name || 'Friend'}`, 'info');
+    }
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;

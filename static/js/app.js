@@ -455,6 +455,16 @@ async function findNearbyFriends(worldwide = false) {
             }),
             popup: "<b>📍 You are here</b>"
         }).openPopup();
+
+        // Add radius circle
+        if (!worldwide) {
+            L.circle([currentLocation.lat, currentLocation.lng], {
+                color: 'var(--brutalist-green)',
+                fillColor: 'var(--brutalist-green)',
+                fillOpacity: 0.1,
+                radius: (parseInt(document.getElementById('radius-slider')?.value) || 50) * 1000
+            }).addTo(friendsMap);
+        }
     } else {
         friendsMap.setView([currentLocation.lat, currentLocation.lng], initialZoom);
     }
@@ -505,8 +515,18 @@ async function findNearbyFriends(worldwide = false) {
             let mapActionBtn = '';
 
             if (user.friend_status === 'accepted') {
-                actionBtn = `<button class="book-btn" onclick="switchFriendsTab('chat'); startChat(${user.id}, '${user.name}')">💬 CHAT</button>`;
-                mapActionBtn = `<button onclick="switchFriendsTab('chat'); startChat(${user.id}, '${user.name}')" style="background:var(--brutalist-green); color:white; border:2px solid black; padding:5px 10px; cursor:pointer; margin-top:5px; font-weight:bold;">💬 CHAT</button>`;
+                actionBtn = `
+                    <div class="action-buttons-row">
+                        <button class="book-btn" onclick="switchFriendsTab('chat'); startChat(${user.id}, '${user.name}')">💬 CHAT</button>
+                        <button class="icon-btn" onclick="sendWave(${user.id}, '${user.name}')" title="Send Wave">👋</button>
+                        <button class="icon-btn" onclick="sendPing(${user.id}, '${user.name}')" title="Send Ping">🔔</button>
+                    </div>`;
+                mapActionBtn = `
+                    <div style="display:flex; gap:5px; margin-top:5px;">
+                        <button onclick="switchFriendsTab('chat'); startChat(${user.id}, '${user.name}')" style="flex:1; background:var(--brutalist-green); color:white; border:2px solid black; padding:5px; cursor:pointer; font-weight:bold;">💬</button>
+                        <button onclick="sendWave(${user.id}, '${user.name}')" style="background:white; color:black; border:2px solid black; padding:5px; cursor:pointer;">👋</button>
+                        <button onclick="sendPing(${user.id}, '${user.name}')" style="background:white; color:black; border:2px solid black; padding:5px; cursor:pointer;">🔔</button>
+                    </div>`;
             } else if (user.friend_status === 'pending') {
                 actionBtn = `<button class="book-btn" disabled>🕒 PENDING</button>`;
                 mapActionBtn = `<button disabled style="background:gray; color:white; border:2px solid black; padding:5px 10px; margin-top:5px;">🕒 PENDING</button>`;
@@ -930,8 +950,34 @@ window.updateUserMarker = function (userId, lat, lng) {
 
     // Check if marker exists
     if (userMarkers[userId]) {
-        // Update existing marker position
-        userMarkers[userId].setLatLng([lat, lng]);
+        // Smooth interpolation
+        const marker = userMarkers[userId];
+        const startLatLng = marker.getLatLng();
+        const endLatLng = L.latLng(lat, lng);
+        
+        // Simple animation loop
+        const duration = 500; // 500ms animation
+        const startTime = performance.now();
+        
+        function animate(currentTime) {
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            // Ease out cubic
+            const ease = 1 - Math.pow(1 - progress, 3);
+            
+            const currentLat = startLatLng.lat + (endLatLng.lat - startLatLng.lat) * ease;
+            const currentLng = startLatLng.lng + (endLatLng.lng - startLatLng.lng) * ease;
+            
+            marker.setLatLng([currentLat, currentLng]);
+            
+            if (progress < 1) {
+                requestAnimationFrame(animate);
+            }
+        }
+        
+        requestAnimationFrame(animate);
+        
     } else {
         // Create new marker
         const marker = L.marker([lat, lng])
@@ -940,6 +986,29 @@ window.updateUserMarker = function (userId, lat, lng) {
 
         userMarkers[userId] = marker;
         friendMarkers.push(marker);
+    }
+};
+
+// Social Features
+window.sendWave = function(userId, userName) {
+    if (window.socket) {
+        window.socket.emit('send_wave', {
+            sender_id: currentUser.id,
+            sender_name: currentUser.name,
+            receiver_id: userId
+        });
+        showToast(`Waved at ${userName}! 👋`, 'success');
+    }
+};
+
+window.sendPing = function(userId, userName) {
+    if (window.socket) {
+        window.socket.emit('send_ping', {
+            sender_id: currentUser.id,
+            sender_name: currentUser.name,
+            receiver_id: userId
+        });
+        showToast(`Pinged ${userName}! 🔔`, 'success');
     }
 };
 

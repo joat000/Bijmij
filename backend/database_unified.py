@@ -4,20 +4,6 @@ Automatically switches based on DATABASE_URL environment variable
 Provides a unified interface that works with existing SQLite-style code
 """
 import os
-from contextlib import contextmanager
-
-# Detect which database to use
-USE_POSTGRES = bool(os.environ.get('DATABASE_URL'))
-
-if USE_POSTGRES:
-    print("[INFO] Using PostgreSQL (Production Mode)")
-    import psycopg2
-    from psycopg2 import pool, extras
-    
-    DATABASE_URL = os.environ.get('DATABASE_URL')
-    connection_pool = None
-    
-    def init_connection_pool():
         """Initialize PostgreSQL connection pool"""
         global connection_pool
         
@@ -139,6 +125,86 @@ else:
         conn = sqlite3.connect(DATABASE_PATH)
         conn.row_factory = sqlite3.Row
         return conn
+
+def update_streak(user_id):
+    """Update user streak based on daily activity"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    try:
+        # Get current streak info
+        if USE_POSTGRES:
+            cursor.execute("SELECT current_streak, last_active_date FROM streaks WHERE user_id = %s", (user_id,))
+        else:
+            cursor.execute("SELECT current_streak, last_active_date FROM streaks WHERE user_id = ?", (user_id,))
+            
+        row = cursor.fetchone()
+        
+        today = datetime.now().date()
+        
+        if row:
+            current_streak = row[0]
+            last_active = row[1]
+            
+            if isinstance(last_active, str):
+                last_active = datetime.strptime(last_active, '%Y-%m-%d').date()
+            
+            if last_active == today:
+                # Already active today, do nothing
+                pass
+            elif last_active == today - timedelta(days=1):
+                # Consecutive day, increment streak
+                new_streak = current_streak + 1
+                if USE_POSTGRES:
+                    cursor.execute("""
+                        UPDATE streaks 
+                        SET current_streak = %s, last_active_date = %s, 
+                            best_streak = GREATEST(best_streak, %s), updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = %s
+                    """, (new_streak, today, new_streak, user_id))
+                else:
+                    cursor.execute("""
+                        UPDATE streaks 
+                        SET current_streak = ?, last_active_date = ?, 
+                            best_streak = MAX(best_streak, ?), updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = ?
+                    """, (new_streak, today, new_streak, user_id))
+            else:
+                # Streak broken, reset to 1
+                if USE_POSTGRES:
+                    cursor.execute("""
+                        UPDATE streaks 
+                        SET current_streak = 1, last_active_date = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = %s
+                    """, (today, user_id))
+                else:
+                    cursor.execute("""
+                        UPDATE streaks 
+                        SET current_streak = 1, last_active_date = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE user_id = ?
+                    """, (today, user_id))
+        else:
+            # First time entry
+            if USE_POSTGRES:
+                cursor.execute("""
+                    INSERT INTO streaks (user_id, current_streak, last_active_date, best_streak)
+                    VALUES (%s, 1, %s, 1)
+                """, (user_id, today))
+            else:
+                cursor.execute("""
+                    INSERT INTO streaks (user_id, current_streak, last_active_date, best_streak)
+                    VALUES (?, 1, ?, 1)
+                """, (user_id, today))
+                
+        conn.commit()
+    except Exception as e:
+        print(f"Error updating streak: {e}")
+    finally:
+        if not USE_POSTGRES:
+            conn.close()
+        else:
+            cursor.close()
+            connection_pool.putconn(conn)
     
     # Define IntegrityError for exception handling
     IntegrityError = sqlite3.IntegrityError
@@ -271,6 +337,29 @@ def init_db():
                 ON messages(receiver_id, is_read) 
                 WHERE is_read = FALSE
             ''')
+
+            # Gamification: Streaks
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS streaks (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    current_streak INTEGER DEFAULT 0,
+                    last_active_date DATE DEFAULT CURRENT_DATE,
+                    best_streak INTEGER DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+
+            # Gamification: Badges
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS badges (
+                    id SERIAL PRIMARY KEY,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    badge_type VARCHAR(50) NOT NULL,
+                    earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(user_id, badge_type)
+                )
+            ''')
             
         else:
             # SQLite schema (existing schema)
@@ -348,6 +437,31 @@ def init_db():
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (sender_id) REFERENCES users(id),
                     FOREIGN KEY (receiver_id) REFERENCES users(id)
+                )
+            ''')
+
+            # Gamification: Streaks
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS streaks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    current_streak INTEGER DEFAULT 0,
+                    last_active_date DATE DEFAULT CURRENT_DATE,
+                    best_streak INTEGER DEFAULT 0,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                )
+            ''')
+
+            # Gamification: Badges
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS badges (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    badge_type TEXT NOT NULL,
+                    earned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (user_id) REFERENCES users(id),
+                    UNIQUE(user_id, badge_type)
                 )
             ''')
         

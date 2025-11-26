@@ -277,8 +277,16 @@
                                     </div>
                                 </div>
                                 <div class="chat-input-area">
-                                    <input type="text" id="chat-input" placeholder="Type a message..." disabled>
-                                    <button id="send-msg-btn" onclick="sendMessage()" disabled>SEND</button>
+                                    <div class="chat-input-wrapper"
+                                        style="display: flex; width: 100%; gap: 10px; align-items: center;">
+                                        <button id="chat-attach-btn"
+                                            onclick="document.getElementById('chat-image-input').click()"
+                                            style="padding: 10px; background: transparent; border: 2px solid var(--text-primary); cursor: pointer;">📷</button>
+                                        <input type="file" id="chat-image-input" hidden accept="image/*">
+                                        <input type="text" id="chat-input" placeholder="Type a message..." disabled
+                                            style="flex: 1;">
+                                        <button id="send-msg-btn" onclick="sendMessage()" disabled>SEND</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -339,13 +347,13 @@
     <!-- Socket.IO for real-time communication -->
     <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <!-- Leaflet for maps -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <!-- Privacy-First Chat Modules -->
     <script src="/js/encryption.js"></script>
     <script src="/js/storage.js"></script>
     <script src="/js/voice-call.js"></script>
     <script src="/js/enhanced-chat.js"></script>
-    
+
     <!-- Location Manager (Real-time tracking) -->
     <script src="/js/location-manager.js"></script>
     <!-- Map Optimizer (Performance & 3D Globe) -->
