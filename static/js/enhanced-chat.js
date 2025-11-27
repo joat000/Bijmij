@@ -286,546 +286,390 @@ class EnhancedChat {
                 </div>
             </div>
         `;
-
-        chatMessages.appendChild(messageEl);
-    }
-
-    /**
-     * Send message
-     */
-    async sendMessage() {
-        const chatInput = document.getElementById('chat-input');
-        if (!chatInput) return;
-
-        const message = chatInput.value.trim();
-        if (!message) return;
-
-        chatInput.value = '';
-        chatInput.style.height = 'auto';
-
-        // Stop typing indicator
-        this.stopTyping();
-
-        // Get friend's public key
-        const friendPublicKey = await window.encryption.getFriendPublicKey(this.currentFriendId);
-        if (!friendPublicKey) {
-            showToast('Encryption key not found. Please refresh.', 'error');
-            return;
-        }
-
-        // Encrypt message
-        const encrypted = await window.encryption.encryptMessage(message, friendPublicKey);
-
-        // Save to IndexedDB immediately
-        const messageData = {
-            userId: currentUser.id,
-            friendId: this.currentFriendId,
-            senderId: currentUser.id,
-            receiverId: this.currentFriendId,
-            message: message, // Store plaintext locally
-            encrypted_data: encrypted.encrypted_data,
-            encrypted_key: encrypted.encrypted_key,
-            iv: encrypted.iv,
-            timestamp: Date.now(),
-            isRead: false,
-            isSent: false,
-            isDelivered: false
-        };
-
-        const messageId = await window.chatStorage.saveMessage(messageData);
-
-        // Render message immediately (optimistic UI)
-        this.renderMessage({
-            id: messageId,
-            senderId: currentUser.id,
-            message: message,
-            timestamp: Date.now(),
-            isRead: false,
-            isSent: false,
-            isDelivered: false,
-            grouped: false
-        });
-
-        this.scrollToBottom();
-
-        // Send encrypted message to server (relay only)
-        socket.emit('send_encrypted_message', {
-            sender_id: currentUser.id,
-            receiver_id: this.currentFriendId,
-            encrypted_data: encrypted.encrypted_data,
-            encrypted_key: encrypted.encrypted_key,
-            iv: encrypted.iv,
-            local_message_id: messageId
-        });
-
-        // Update sent status after server confirms
-        socket.once('message_sent_confirmed', (data) => {
-            if (data.local_message_id === messageId) {
-                this.updateMessageSentStatus(messageId);
-            }
-        });
-    }
-
-    /**
-     * Handle incoming message
-     */
-    async handleIncomingMessage(data) {
-        // Decrypt message
-        let messageText = '[Encrypted message]';
-        if (data.encrypted_data && window.encryption) {
-            try {
-                messageText = await window.encryption.decryptMessage({
-                    encrypted_data: data.encrypted_data,
-                    encrypted_key: data.encrypted_key,
-                    iv: data.iv
-                });
-            } catch (error) {
-                console.error('Failed to decrypt message:', error);
-            }
-        }
-
-        // Save to IndexedDB
-        const messageData = {
-            userId: currentUser.id,
-            friendId: data.sender_id,
-            senderId: data.sender_id,
-            receiverId: currentUser.id,
-            message: messageText,
-            encrypted_data: data.encrypted_data,
-            encrypted_key: data.encrypted_key,
-            iv: data.iv,
-            timestamp: Date.now(),
-            isRead: false,
-            isSent: true,
-            isDelivered: true
-        };
-
-        const messageId = await window.chatStorage.saveMessage(messageData);
-
-        // If chat is open with this friend, render message
-        if (this.currentFriendId === data.sender_id) {
-            this.renderMessage({
-                id: messageId,
-                senderId: data.sender_id,
-                message: messageText,
-                timestamp: Date.now(),
-                isRead: false,
-                isSent: true,
-                isDelivered: true,
-                grouped: false
+        handleTyping() {
+            // Send typing event
+            socket.emit('typing', {
+                user_id: currentUser.id,
+                user_name: currentUser.name,
+                receiver_id: this.currentFriendId
             });
 
-            this.scrollToBottom();
+            // Clear previous timeout
+            if (this.typingTimeout) {
+                clearTimeout(this.typingTimeout);
+            }
 
-            // Mark as read
-            this.markMessageAsRead(messageId);
+            // Stop typing after 3 seconds
+            this.typingTimeout = setTimeout(() => {
+                this.stopTyping();
+            }, 3000);
+        }
 
-            // Send read receipt (ephemeral)
-            socket.emit('send_read_receipt', {
-                message_id: data.server_message_id,
-                sender_id: data.sender_id
+        stopTyping() {
+            socket.emit('stopped_typing', {
+                user_id: currentUser.id,
+                receiver_id: this.currentFriendId
             });
-        } else {
-            // Increment unread count
-            this.unreadMessages[data.sender_id] = (this.unreadMessages[data.sender_id] || 0) + 1;
-            this.updateChatListUnread(data.sender_id);
         }
 
-        // Play notification sound
-        const audio = document.getElementById('notification-sound');
-        if (audio) audio.play();
+        showTypingIndicator(userId, userName) {
+            if (userId !== this.currentFriendId) return;
 
-        // Show toast notification
-        showToast(`New message from ${data.sender_name}`, 'info');
-    }
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) return;
 
-    /**
-     * Typing indicator
-     */
-    handleTyping() {
-        // Send typing event
-        socket.emit('typing', {
-            user_id: currentUser.id,
-            user_name: currentUser.name,
-            receiver_id: this.currentFriendId
-        });
+            // Remove existing indicator
+            const existing = document.getElementById('typing-indicator');
+            if (existing) existing.remove();
 
-        // Clear previous timeout
-        if (this.typingTimeout) {
-            clearTimeout(this.typingTimeout);
-        }
-
-        // Stop typing after 3 seconds
-        this.typingTimeout = setTimeout(() => {
-            this.stopTyping();
-        }, 3000);
-    }
-
-    stopTyping() {
-        socket.emit('stopped_typing', {
-            user_id: currentUser.id,
-            receiver_id: this.currentFriendId
-        });
-    }
-
-    showTypingIndicator(userId, userName) {
-        if (userId !== this.currentFriendId) return;
-
-        const chatMessages = document.getElementById('chat-messages');
-        if (!chatMessages) return;
-
-        // Remove existing indicator
-        const existing = document.getElementById('typing-indicator');
-        if (existing) existing.remove();
-
-        const indicator = document.createElement('div');
-        indicator.id = 'typing-indicator';
-        indicator.className = 'typing-indicator';
-        indicator.innerHTML = `
+            const indicator = document.createElement('div');
+            indicator.id = 'typing-indicator';
+            indicator.className = 'typing-indicator';
+            indicator.innerHTML = `
             <div class="typing-dots">
                 <span></span><span></span><span></span>
             </div>
             <span class="typing-text">${userName} is typing...</span>
         `;
 
-        chatMessages.appendChild(indicator);
-        this.scrollToBottom();
-    }
-
-    hideTypingIndicator(userId) {
-        if (userId !== this.currentFriendId) return;
-
-        const indicator = document.getElementById('typing-indicator');
-        if (indicator) indicator.remove();
-    }
-
-    /**
-     * Update online status
-     */
-    updateOnlineStatus(userId, isOnline) {
-        // Update chat header if chatting with this user
-        if (userId === this.currentFriendId) {
-            this.updateChatHeader(this.currentFriendName, userId);
+            chatMessages.appendChild(indicator);
+            this.scrollToBottom();
         }
 
-        // Update chat list
-        const chatItem = document.querySelector(`[data-friend-id="${userId}"]`);
-        if (chatItem) {
-            const statusEl = chatItem.querySelector('.online-status');
-            if (statusEl) {
-                statusEl.textContent = isOnline ? '● Online' : '○ Offline';
-                statusEl.className = isOnline ? 'online-status online' : 'online-status offline';
+        hideTypingIndicator(userId) {
+            if (userId !== this.currentFriendId) return;
+
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        /**
+         * Update online status
+         */
+        updateOnlineStatus(userId, isOnline) {
+            // Update chat header if chatting with this user
+            if (userId === this.currentFriendId) {
+                this.updateChatHeader(this.currentFriendName, userId);
+            }
+
+            // Update chat list
+            const chatItem = document.querySelector(`[data-friend-id="${userId}"]`);
+            if (chatItem) {
+                const statusEl = chatItem.querySelector('.online-status');
+                if (statusEl) {
+                    statusEl.textContent = isOnline ? '● Online' : '○ Offline';
+                    statusEl.className = isOnline ? 'online-status online' : 'online-status offline';
+                }
             }
         }
-    }
 
     /**
      * Mark message as read
      */
     async markMessageAsRead(messageId) {
-        if (window.chatStorage && window.chatStorage.db) {
-            await window.chatStorage.updateMessageReadStatus(messageId, true);
+            if (window.chatStorage && window.chatStorage.db) {
+                await window.chatStorage.updateMessageReadStatus(messageId, true);
+            }
         }
-    }
 
     /**
      * Mark conversation as read
      */
     async markConversationAsRead(friendId) {
-        // Update unread count
-        this.unreadMessages[friendId] = 0;
-        this.updateChatListUnread(friendId);
-    }
-
-    /**
-     * Update message sent status
-     */
-    updateMessageSentStatus(messageId) {
-        const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
-        if (messageEl) {
-            const receipt = messageEl.querySelector('.read-receipt');
-            if (receipt) {
-                receipt.className = 'read-receipt sent';
-                receipt.textContent = '✓';
-            }
+            // Update unread count
+            this.unreadMessages[friendId] = 0;
+            this.updateChatListUnread(friendId);
         }
-    }
 
-    /**
-     * Update message delivered status
-     */
-    updateMessageDeliveredStatus(messageId) {
-        const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
-        if (messageEl) {
-            const receipt = messageEl.querySelector('.read-receipt');
-            if (receipt) {
-                receipt.className = 'read-receipt delivered';
-                receipt.textContent = '✓✓';
-            }
-        }
-    }
-
-    /**
-     * Update message read status
-     */
-    updateMessageReadStatus(messageId, isRead) {
-        const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
-        if (messageEl) {
-            const receipt = messageEl.querySelector('.read-receipt');
-            if (receipt && isRead) {
-                receipt.className = 'read-receipt read';
-                receipt.textContent = '✓✓';
-            }
-        }
-    }
-
-    /**
-     * Update chat list unread count
-     */
-    updateChatListUnread(friendId) {
-        const chatItem = document.querySelector(`[data-friend-id="${friendId}"]`);
-        if (chatItem) {
-            let badge = chatItem.querySelector('.unread-badge');
-            const count = this.unreadMessages[friendId] || 0;
-
-            if (count > 0) {
-                if (!badge) {
-                    badge = document.createElement('span');
-                    badge.className = 'unread-badge';
-                    chatItem.appendChild(badge);
+        /**
+         * Update message sent status
+         */
+        updateMessageSentStatus(messageId) {
+            const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (messageEl) {
+                const receipt = messageEl.querySelector('.read-receipt');
+                if (receipt) {
+                    receipt.className = 'read-receipt sent';
+                    receipt.textContent = '✓';
                 }
-                badge.textContent = count;
-            } else {
-                if (badge) badge.remove();
             }
         }
-    }
 
-    /**
-     * Intelligent auto-scroll
-     */
-    scrollToBottom(force = false) {
-        const chatMessages = document.getElementById('chat-messages');
-        if (!chatMessages) return;
-
-        const isAtBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 100;
-
-        if (force || isAtBottom) {
-            chatMessages.scrollTo({
-                top: chatMessages.scrollHeight,
-                behavior: 'smooth'
-            });
+        /**
+         * Update message delivered status
+         */
+        updateMessageDeliveredStatus(messageId) {
+            const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (messageEl) {
+                const receipt = messageEl.querySelector('.read-receipt');
+                if (receipt) {
+                    receipt.className = 'read-receipt delivered';
+                    receipt.textContent = '✓✓';
+                }
+            }
         }
-    }
 
-    /**
-     * Format date for separator
-     */
-    formatDate(date) {
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
-
-        if (date.toDateString() === today.toDateString()) {
-            return 'Today';
-        } else if (date.toDateString() === yesterday.toDateString()) {
-            return 'Yesterday';
-        } else {
-            return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        /**
+         * Update message read status
+         */
+        updateMessageReadStatus(messageId, isRead) {
+            const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (messageEl) {
+                const receipt = messageEl.querySelector('.read-receipt');
+                if (receipt && isRead) {
+                    receipt.className = 'read-receipt read';
+                    receipt.textContent = '✓✓';
+                }
+            }
         }
-    }
 
-    /**
-     * Format time for message
-     */
-    formatTime(timestamp) {
-        const date = new Date(timestamp);
-        const now = Date.now();
-        const diff = now - timestamp;
+        /**
+         * Update chat list unread count
+         */
+        updateChatListUnread(friendId) {
+            const chatItem = document.querySelector(`[data-friend-id="${friendId}"]`);
+            if (chatItem) {
+                let badge = chatItem.querySelector('.unread-badge');
+                const count = this.unreadMessages[friendId] || 0;
 
-        if (diff < 60000) {
-            return 'Just now';
-        } else if (diff < 3600000) {
-            const mins = Math.floor(diff / 60000);
-            return `${mins} min${mins > 1 ? 's' : ''} ago`;
-        } else {
-            return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                if (count > 0) {
+                    if (!badge) {
+                        badge = document.createElement('span');
+                        badge.className = 'unread-badge';
+                        chatItem.appendChild(badge);
+                    }
+                    badge.textContent = count;
+                } else {
+                    if (badge) badge.remove();
+                }
+            }
         }
-    }
+
+        /**
+         * Intelligent auto-scroll
+         */
+        scrollToBottom(force = false) {
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) return;
+
+            const isAtBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 100;
+
+            if (force || isAtBottom) {
+                chatMessages.scrollTo({
+                    top: chatMessages.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }
+        }
+
+        /**
+         * Format date for separator
+         */
+        formatDate(date) {
+            const today = new Date();
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+
+            if (date.toDateString() === today.toDateString()) {
+                return 'Today';
+            } else if (date.toDateString() === yesterday.toDateString()) {
+                return 'Yesterday';
+            } else {
+                return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            }
+        }
+
+        /**
+         * Format time for message
+         */
+        formatTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = Date.now();
+            const diff = now - timestamp;
+
+            if (diff < 60000) {
+                return 'Just now';
+            } else if (diff < 3600000) {
+                const mins = Math.floor(diff / 60000);
+                return `${mins} min${mins > 1 ? 's' : ''} ago`;
+            } else {
+                return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+            }
+        }
 
     /**
      * Handle image selection
      */
     async handleImageSelection(file) {
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
-            showToast('Image too large (max 5MB)', 'error');
-            return;
-        }
+            if (file.size > 5 * 1024 * 1024) { // 5MB limit
+                showToast('Image too large (max 5MB)', 'error');
+                return;
+            }
 
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const imageData = e.target.result;
-            await this.sendImage(imageData);
-        };
-        reader.readAsDataURL(file);
-    }
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const imageData = e.target.result;
+                await this.sendImage(imageData);
+            };
+            reader.readAsDataURL(file);
+        }
 
     /**
      * Send image message
      */
     async sendImage(imageData) {
-        // 1. Save locally and render
-        const messageData = {
-            userId: currentUser.id,
-            friendId: this.currentFriendId,
-            senderId: currentUser.id,
-            receiverId: this.currentFriendId,
-            message: imageData, // Store base64 image
-            timestamp: Date.now(),
-            isRead: false,
-            isSent: false,
-            isDelivered: false
-        };
+            // 1. Save locally and render
+            const messageData = {
+                userId: currentUser.id,
+                friendId: this.currentFriendId,
+                senderId: currentUser.id,
+                receiverId: this.currentFriendId,
+                message: imageData, // Store base64 image
+                timestamp: Date.now(),
+                isRead: false,
+                isSent: false,
+                isDelivered: false
+            };
 
-        const messageId = await window.chatStorage.saveMessage(messageData);
+            const messageId = await window.chatStorage.saveMessage(messageData);
 
-        this.renderMessage({
-            id: messageId,
-            senderId: currentUser.id,
-            message: imageData,
-            timestamp: Date.now(),
-            isRead: false,
-            isSent: false,
-            isDelivered: false,
-            grouped: false
-        });
-        this.scrollToBottom();
-
-        // 2. Chunk and send
-        const CHUNK_SIZE = 100 * 1024; // 100KB chunks
-        const totalChunks = Math.ceil(imageData.length / CHUNK_SIZE);
-        const transferId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-
-        for (let i = 0; i < totalChunks; i++) {
-            const chunk = imageData.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-            socket.emit('send_image_chunk', {
-                receiver_id: this.currentFriendId,
-                sender_id: currentUser.id,
-                chunk: chunk,
-                chunk_index: i,
-                total_chunks: totalChunks,
-                transfer_id: transferId
+            this.renderMessage({
+                id: messageId,
+                senderId: currentUser.id,
+                message: imageData,
+                timestamp: Date.now(),
+                isRead: false,
+                isSent: false,
+                isDelivered: false,
+                grouped: false
             });
+            this.scrollToBottom();
+
+            // 2. Chunk and send
+            const CHUNK_SIZE = 100 * 1024; // 100KB chunks
+            const totalChunks = Math.ceil(imageData.length / CHUNK_SIZE);
+            const transferId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+
+            for (let i = 0; i < totalChunks; i++) {
+                const chunk = imageData.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+                socket.emit('send_image_chunk', {
+                    receiver_id: this.currentFriendId,
+                    sender_id: currentUser.id,
+                    chunk: chunk,
+                    chunk_index: i,
+                    total_chunks: totalChunks,
+                    transfer_id: transferId
+                });
+            }
         }
-    }
 
     /**
      * Handle incoming image chunk
      */
     async handleImageChunk(data) {
-        if (!this.imageTransfers) this.imageTransfers = {};
+            if (!this.imageTransfers) this.imageTransfers = {};
 
-        if (!this.imageTransfers[data.transfer_id]) {
-            this.imageTransfers[data.transfer_id] = {
-                chunks: [],
-                count: 0,
-                total: data.total_chunks,
-                sender_id: data.sender_id
-            };
+            if (!this.imageTransfers[data.transfer_id]) {
+                this.imageTransfers[data.transfer_id] = {
+                    chunks: [],
+                    count: 0,
+                    total: data.total_chunks,
+                    sender_id: data.sender_id
+                };
+            }
+
+            const transfer = this.imageTransfers[data.transfer_id];
+            transfer.chunks[data.chunk_index] = data.chunk;
+            transfer.count++;
+
+            if (transfer.count === transfer.total) {
+                // All chunks received
+                const fullImage = transfer.chunks.join('');
+                delete this.imageTransfers[data.transfer_id];
+
+                // Process as a normal message
+                await this.handleIncomingMessage({
+                    sender_id: transfer.sender_id,
+                    sender_name: this.currentFriendName || 'Friend', // Fallback
+                    encrypted_data: null, // Not encrypted in this simple implementation
+                    message: fullImage // Pass directly if not encrypted
+                }, true); // isImage flag
+            }
         }
-
-        const transfer = this.imageTransfers[data.transfer_id];
-        transfer.chunks[data.chunk_index] = data.chunk;
-        transfer.count++;
-
-        if (transfer.count === transfer.total) {
-            // All chunks received
-            const fullImage = transfer.chunks.join('');
-            delete this.imageTransfers[data.transfer_id];
-
-            // Process as a normal message
-            await this.handleIncomingMessage({
-                sender_id: transfer.sender_id,
-                sender_name: this.currentFriendName || 'Friend', // Fallback
-                encrypted_data: null, // Not encrypted in this simple implementation
-                message: fullImage // Pass directly if not encrypted
-            }, true); // isImage flag
-        }
-    }
 
     /**
      * Override handleIncomingMessage to support direct image data
      */
     async handleIncomingMessage(data, isImage = false) {
-        let messageText = '[Encrypted message]';
+            let messageText = '[Encrypted message]';
 
-        if (isImage) {
-            messageText = data.message;
-        } else if (data.encrypted_data && window.encryption) {
-            try {
-                messageText = await window.encryption.decryptMessage({
-                    encrypted_data: data.encrypted_data,
-                    encrypted_key: data.encrypted_key,
-                    iv: data.iv
-                });
-            } catch (error) {
-                console.error('Failed to decrypt message:', error);
+            if (isImage) {
+                messageText = data.message;
+            } else if (data.encrypted_data && window.encryption) {
+                try {
+                    messageText = await window.encryption.decryptMessage({
+                        encrypted_data: data.encrypted_data,
+                        encrypted_key: data.encrypted_key,
+                        iv: data.iv
+                    });
+                } catch (error) {
+                    console.error('Failed to decrypt message:', error);
+                }
             }
-        }
 
-        // Save to IndexedDB
-        const messageData = {
-            userId: currentUser.id,
-            friendId: data.sender_id,
-            senderId: data.sender_id,
-            receiverId: currentUser.id,
-            message: messageText,
-            timestamp: Date.now(),
-            isRead: false,
-            isSent: true,
-            isDelivered: true
-        };
-
-        const messageId = await window.chatStorage.saveMessage(messageData);
-
-        // If chat is open with this friend, render message
-        if (this.currentFriendId === data.sender_id) {
-            this.renderMessage({
-                id: messageId,
+            // Save to IndexedDB
+            const messageData = {
+                userId: currentUser.id,
+                friendId: data.sender_id,
                 senderId: data.sender_id,
+                receiverId: currentUser.id,
                 message: messageText,
                 timestamp: Date.now(),
                 isRead: false,
                 isSent: true,
-                isDelivered: true,
-                grouped: false
-            });
+                isDelivered: true
+            };
 
-            this.scrollToBottom();
-            this.markMessageAsRead(messageId);
+            const messageId = await window.chatStorage.saveMessage(messageData);
 
-            if (!isImage) { // Don't send read receipt for image chunks logic yet
-                socket.emit('send_read_receipt', {
-                    message_id: data.server_message_id,
-                    sender_id: data.sender_id
+            // If chat is open with this friend, render message
+            if (this.currentFriendId === data.sender_id) {
+                this.renderMessage({
+                    id: messageId,
+                    senderId: data.sender_id,
+                    message: messageText,
+                    timestamp: Date.now(),
+                    isRead: false,
+                    isSent: true,
+                    isDelivered: true,
+                    grouped: false
                 });
+
+                this.scrollToBottom();
+                this.markMessageAsRead(messageId);
+
+                if (!isImage) { // Don't send read receipt for image chunks logic yet
+                    socket.emit('send_read_receipt', {
+                        message_id: data.server_message_id,
+                        sender_id: data.sender_id
+                    });
+                }
+            } else {
+                this.unreadMessages[data.sender_id] = (this.unreadMessages[data.sender_id] || 0) + 1;
+                this.updateChatListUnread(data.sender_id);
             }
-        } else {
-            this.unreadMessages[data.sender_id] = (this.unreadMessages[data.sender_id] || 0) + 1;
-            this.updateChatListUnread(data.sender_id);
+
+            const audio = document.getElementById('notification-sound');
+            if (audio) audio.play();
+            showToast(`New message from ${data.sender_name || 'Friend'}`, 'info');
         }
 
-        const audio = document.getElementById('notification-sound');
-        if (audio) audio.play();
-        showToast(`New message from ${data.sender_name || 'Friend'}`, 'info');
+        escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
     }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
-    }
-}
 
 // Global instance
 window.enhancedChat = new EnhancedChat();

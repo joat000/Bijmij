@@ -247,9 +247,18 @@ def init_db():
                     longitude DOUBLE PRECISION,
                     last_location_update TIMESTAMP,
                     public_key TEXT,
+                    last_seen TIMESTAMP,
+                    is_online BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            
+            # Migration: Add last_seen and is_online if not exists
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP")
+                cursor.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT FALSE")
+            except Exception as e:
+                print(f"Migration note: {e}")
             
             # Optimized indexes
             cursor.execute('''
@@ -385,9 +394,21 @@ def init_db():
                     longitude REAL,
                     last_location_update TIMESTAMP,
                     public_key TEXT,
+                    last_seen TIMESTAMP,
+                    is_online INTEGER DEFAULT 0,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
+            
+            # Migration for SQLite
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN last_seen TIMESTAMP")
+            except:
+                pass
+            try:
+                cursor.execute("ALTER TABLE users ADD COLUMN is_online INTEGER DEFAULT 0")
+            except:
+                pass
             
             cursor.execute('''
                 CREATE INDEX IF NOT EXISTS idx_user_location 

@@ -39,6 +39,20 @@ def init_socketio(app):
                 break
         if user_to_remove:
             del active_users[user_to_remove]
+            
+            # Update DB: Set offline and last_seen
+            try:
+                conn = get_db()
+                cursor = conn.cursor()
+                if hasattr(conn, 'cursor_factory') or os.environ.get('DATABASE_URL'): # Postgres
+                    cursor.execute('UPDATE users SET is_online = FALSE, last_seen = CURRENT_TIMESTAMP WHERE id = %s', (user_to_remove,))
+                else: # SQLite
+                    cursor.execute('UPDATE users SET is_online = 0, last_seen = CURRENT_TIMESTAMP WHERE id = ?', (user_to_remove,))
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                print(f"Error updating offline status: {e}")
+
             # Broadcast user offline
             emit('user_offline', {'user_id': user_to_remove}, broadcast=True)
     
@@ -54,6 +68,20 @@ def init_socketio(app):
                 'lng': data.get('lng'),
                 'last_update': time.time()
             }
+            
+            # Update DB: Set online
+            try:
+                conn = get_db()
+                cursor = conn.cursor()
+                if hasattr(conn, 'cursor_factory') or os.environ.get('DATABASE_URL'): # Postgres
+                    cursor.execute('UPDATE users SET is_online = TRUE WHERE id = %s', (user_id,))
+                else: # SQLite
+                    cursor.execute('UPDATE users SET is_online = 1 WHERE id = ?', (user_id,))
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                print(f"Error updating online status: {e}")
+
             print(f'User {user_id} online')
             # Broadcast to others
             emit('user_online', {'user_id': user_id}, broadcast=True, include_self=False)

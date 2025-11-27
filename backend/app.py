@@ -510,15 +510,28 @@ def accept_friend_request():
 
 @app.route('/api/friends/list/<int:user_id>', methods=['GET'])
 def get_friends_list(user_id):
-    """Get user's friends list"""
+    """Get user's friends list with last message and unread count"""
     try:
-
         conn = get_db()
         try:
             cursor = conn.cursor()
             
-            cursor.execute('''
-                SELECT u.id, u.name, u.email, u.profile_photo, f.status
+            # Complex query to get friends + last message + unread count
+            # Works on both SQLite and Postgres
+            query = '''
+                SELECT 
+                    u.id, u.name, u.email, u.profile_photo, u.is_online, u.last_seen,
+                    f.status,
+                    (SELECT message FROM messages m 
+                     WHERE (m.sender_id = u.id AND m.receiver_id = ?) 
+                        OR (m.sender_id = ? AND m.receiver_id = u.id)
+                     ORDER BY m.created_at DESC LIMIT 1) as last_message,
+                    (SELECT created_at FROM messages m 
+                     WHERE (m.sender_id = u.id AND m.receiver_id = ?) 
+                        OR (m.sender_id = ? AND m.receiver_id = u.id)
+                     ORDER BY m.created_at DESC LIMIT 1) as last_message_time,
+                    (SELECT COUNT(*) FROM messages m 
+                     WHERE m.sender_id = u.id AND m.receiver_id = ? AND m.is_read = 0) as unread_count
                 FROM friends f
                 JOIN users u ON (
                     (f.user_id = ? AND f.friend_id = u.id) OR
@@ -526,7 +539,13 @@ def get_friends_list(user_id):
                 )
                 WHERE (f.user_id = ? OR f.friend_id = ?)
                   AND f.status = 'accepted'
-            ''', (user_id, user_id, user_id, user_id))
+                ORDER BY last_message_time DESC NULLS LAST
+            '''
+            
+            # Params: user_id (x5 for subqueries), user_id (x4 for main query)
+            params = (user_id, user_id, user_id, user_id, user_id, user_id, user_id, user_id, user_id)
+            
+            cursor.execute(query, params)
             
             friends = [dict(row) for row in cursor.fetchall()]
         finally:

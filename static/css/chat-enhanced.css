@@ -650,6 +650,201 @@ body.dark-mode .message-received .message-content {
     background: #2a2a2a;
     color: white;
 }
+}
+
+.reject-btn {
+    background: var(--brutalist-red);
+    color: white;
+}
+
+.call-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--text-primary);
+}
+
+.call-controls {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+}
+
+.call-control-btn {
+    padding: 15px 25px;
+    background: var(--bg-secondary);
+    border: 3px solid var(--text-primary);
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.call-control-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 4px 4px 0 var(--text-primary);
+}
+
+.end-call-btn {
+    background: var(--brutalist-red);
+    color: white;
+}
+
+/* ============================================
+   MOBILE RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+    .chat-container {
+        height: calc(100vh - 100px);
+    }
+
+    .chat-sidebar {
+        display: none;
+    }
+
+    .chat-sidebar.mobile-visible {
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 80%;
+        z-index: 1000;
+        box-shadow: 4px 0 10px rgba(0, 0, 0, 0.3);
+    }
+
+    .message-content {
+        max-width: 85%;
+    }
+
+    .chat-header {
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-start;
+    }
+
+    .chat-header-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .voice-call-btn {
+        padding: 8px 15px;
+        font-size: 0.9rem;
+    }
+
+    .encryption-badge {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+    }
+
+    .call-modal-content {
+        min-width: 90%;
+        padding: 30px 20px;
+    }
+
+    .caller-photo-large {
+        font-size: 6rem;
+    }
+
+    .call-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+
+    .call-btn {
+        width: 100%;
+    }
+}
+
+/* ============================================
+   LOADING STATES
+   ============================================ */
+
+.message-loading {
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+}
+
+.loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--bg-secondary);
+    border-top: 4px solid var(--brutalist-green);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+.slide-up {
+    animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-in;
+}
+
+/* ============================================
+   SCROLL TO BOTTOM BUTTON
+   ============================================ */
+
+.scroll-to-bottom-btn {
+    position: absolute;
+    bottom: 100px;
+    right: 30px;
+    background: var(--brutalist-green);
+    color: white;
+    border: 3px solid var(--text-primary);
+    padding: 10px 20px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 4px 4px 0 var(--text-primary);
+    z-index: 100;
+    transition: all 0.2s;
+}
+
+.scroll-to-bottom-btn:hover {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--text-primary);
+}
+
+/* ============================================
+   DARK MODE ADJUSTMENTS
+   ============================================ */
+
+body.dark-mode .message-sent .message-content {
+    background: var(--brutalist-green);
+    color: white;
+}
+
+body.dark-mode .message-received .message-content {
+    background: #2a2a2a;
+    color: white;
+}
 
 body.dark-mode .date-separator span {
     background: var(--bg-primary);
@@ -657,4 +852,225 @@ body.dark-mode .date-separator span {
 
 body.dark-mode .call-modal {
     background: rgba(0, 0, 0, 0.95);
+}
+
+/* ============================================
+   ENHANCED CHAT LIST ITEMS
+   ============================================ */
+
+.chat-list-item {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.chat-list-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+
+.chat-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-list-name {
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+.chat-list-time {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.chat-list-preview {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.chat-list-message {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
+.chat-list-message.unread {
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+/* ============================================
+   MINI PROFILE CARD (MAP POPUP)
+   ============================================ */
+
+.custom-popup .leaflet-popup-content-wrapper {
+    background: var(--bg-primary);
+    border: 3px solid var(--text-primary);
+    border-radius: 0;
+    box-shadow: 6px 6px 0 rgba(0,0,0,0.2);
+    padding: 0;
+}
+
+.custom-popup .leaflet-popup-content {
+    margin: 0;
+    width: auto !important;
+}
+
+.mini-profile-card {
+    padding: 15px;
+    min-width: 220px;
+}
+
+.mini-profile-header {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+    border-bottom: 2px solid var(--border-color, #eee);
+    padding-bottom: 10px;
+}
+
+.mini-profile-photo {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 2px solid var(--text-primary);
+    object-fit: cover;
+}
+
+.mini-profile-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 900;
+}
+
+.status-badge {
+    font-size: 0.75rem;
+    display: inline-block;
+    margin-top: 2px;
+}
+
+.status-badge.online {
+    color: var(--brutalist-green);
+    font-weight: bold;
+}
+
+.status-badge.offline {
+    color: var(--text-secondary);
+}
+
+.mini-profile-body p {
+    margin: 5px 0 15px 0;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.mini-profile-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.mini-profile-actions button {
+    flex: 1;
+    padding: 8px;
+    border: 2px solid var(--text-primary);
+    background: white;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.mini-profile-actions button:hover {
+    background: var(--bg-secondary);
+    transform: translateY(-2px);
+}
+
+/* Marker Pulse Animation */
+.custom-marker-container {
+    background: transparent;
+}
+
+.marker-pin {
+    width: 40px;
+    height: 40px;
+    border-radius: 50% 50% 50% 0;
+    background: var(--brutalist-green);
+    position: absolute;
+    transform: rotate(-45deg);
+    left: 50%;
+    top: 50%;
+    margin: -20px 0 0 -20px;
+    border: 3px solid var(--text-primary);
+    background-size: cover;
+    background-position: center;
+    box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+    transition: all 0.3s ease;
+}
+
+.marker-pin::after {
+    content: '';
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: inherit;
+    z-index: -1;
+    transform: rotate(45deg); /* Fix rotation for image */
+}
+
+/* Fix image rotation inside pin */
+.marker-pin {
+    overflow: hidden;
+}
+
+.marker-pulse {
+    background: rgba(0, 255, 0, 0.5);
+    border-radius: 50%;
+    height: 14px;
+    width: 14px;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    margin: 11px 0px 0px -7px;
+    transform: rotateX(55deg);
+    z-index: -2;
+}
+
+.marker-pulse:after {
+    content: "";
+    border-radius: 50%;
+    height: 40px;
+    width: 40px;
+    position: absolute;
+    margin: -13px 0 0 -13px;
+    animation: pulsate 1s ease-out;
+    animation-iteration-count: infinite; 
+    opacity: 0.0;
+    box-shadow: 0 0 1px 2px #00ff00;
+    animation-delay: 1.1s;
+}
+
+@keyframes pulsate {
+    0% {
+        transform: scale(0.1, 0.1);
+        opacity: 0.0;
+    }
+    50% {
+        opacity: 1.0;
+    }
+    100% {
+        transform: scale(1.2, 1.2);
+        opacity: 0.0;
+    }
 }

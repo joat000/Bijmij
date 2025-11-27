@@ -565,17 +565,47 @@ async function findNearbyFriends(worldwide = false) {
                 // Add to bounds
                 markerBounds.push([user.latitude, user.longitude]);
 
-                // Create marker
-                const marker = L.marker([user.latitude, user.longitude])
+                // Create marker with custom icon
+                const marker = L.marker([user.latitude, user.longitude], {
+                    icon: L.divIcon({
+                        className: 'custom-marker-container',
+                        html: `
+                            <div class="marker-pin" style="background-image: url('${user.profile_photo || 'https://via.placeholder.com/40'}');"></div>
+                            <div class="marker-pulse"></div>
+                        `,
+                        iconSize: [40, 40],
+                        iconAnchor: [20, 40],
+                        popupAnchor: [0, -40]
+                    })
+                })
                     .addTo(friendsMap)
                     .bindPopup(`
-                        <div style="text-align:center; font-family:'Courier New', monospace;">
-                            <b>${user.name}</b><br>
-                            <span style="color: ${worldwide && user.distance > 100 ? 'green' : 'black'}; font-weight: bold;">${distanceDisplay}</span><br>
-                            ${mapActionBtn}
+                        <div class="mini-profile-card">
+                            <div class="mini-profile-header">
+                                <img src="${user.profile_photo || 'https://via.placeholder.com/40'}" class="mini-profile-photo">
+                                <div>
+                                    <h4>${user.name}</h4>
+                                    <span class="status-badge ${user.is_online ? 'online' : 'offline'}">
+                                        ${user.is_online ? '● Online' : '○ Offline'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="mini-profile-body">
+                                <p>📍 ${distanceDisplay}</p>
+                                <div class="mini-profile-actions">
+                                    ${mapActionBtn}
+                                </div>
+                            </div>
                         </div>
-                    `);
+                    `, {
+                        className: 'custom-popup',
+                        closeButton: false,
+                        minWidth: 200
+                    });
+
+                // Store marker reference
                 friendMarkers.push(marker);
+                userMarkers[user.id] = marker;
             }
         });
 
@@ -594,6 +624,42 @@ async function findNearbyFriends(worldwide = false) {
         showToast('Failed to find friends', 'error');
     }
 }
+
+// Global function to update user marker smoothly
+window.updateUserMarker = function (userId, lat, lng) {
+    if (!friendsMap || !userMarkers[userId]) return;
+
+    const marker = userMarkers[userId];
+    const startLatLng = marker.getLatLng();
+    const endLatLng = L.latLng(lat, lng);
+
+    // Simple interpolation for smoothness (CSS transition handled in CSS)
+    // But Leaflet setLatLng is instant, so we use a small animation loop or CSS
+    // For best performance, we just update it and let CSS transition on the marker element handle it
+    // if we add a class.
+
+    // However, Leaflet markers are not easily CSS animatable for position.
+    // We can use a simple requestAnimationFrame loop.
+
+    const duration = 300; // ms
+    const start = performance.now();
+
+    function animate(time) {
+        const timeFraction = (time - start) / duration;
+        if (timeFraction > 1) {
+            marker.setLatLng(endLatLng);
+            return;
+        }
+
+        const lat = startLatLng.lat + (endLatLng.lat - startLatLng.lat) * timeFraction;
+        const lng = startLatLng.lng + (endLatLng.lng - startLatLng.lng) * timeFraction;
+
+        marker.setLatLng([lat, lng]);
+        requestAnimationFrame(animate);
+    }
+
+    requestAnimationFrame(animate);
+};
 
 async function sendFriendRequest(friendId) {
     try {
@@ -738,21 +804,48 @@ async function loadChatFriends() {
 
         list.innerHTML = '';
 
+        if (friends.length === 0) {
+            list.innerHTML = '<p class="empty-state">No friends yet</p>';
+            return;
+        }
+
         friends.forEach(friend => {
             const item = document.createElement('div');
             item.className = 'chat-list-item';
+            item.dataset.friendId = friend.id;
             if (currentChatFriendId === friend.id) item.classList.add('active');
 
             item.onclick = () => startChat(friend.id, friend.name);
 
+            const lastMsg = friend.last_message ?
+                (friend.last_message.startsWith('data:image') ? '📷 Photo' : friend.last_message) :
+                'Start a conversation';
+
+            const timeDisplay = friend.last_message_time ? formatTimeShort(friend.last_message_time) : '';
+
+            const unreadBadge = friend.unread_count > 0 ?
+                `<span class="unread-badge">${friend.unread_count}</span>` : '';
+
+            const onlineStatus = friend.is_online ? 'online' : 'offline';
+
             item.innerHTML = `
-                <div class="profile-photo-container" style="width: 40px; height: 40px; margin: 0; border-width: 2px;">
+                <div class="profile-photo-container" style="width: 50px; height: 50px; margin: 0; border-width: 2px;">
                     ${friend.profile_photo ?
                     `<img src="${friend.profile_photo}" class="profile-photo">` :
                     `<div class="profile-photo" style="font-size: 1.2rem;">👤</div>`
                 }
+                    <div class="online-status ${onlineStatus}"></div>
                 </div>
-                <span style="font-weight: bold;">${friend.name}</span>
+                <div class="chat-list-info">
+                    <div class="chat-list-header">
+                        <span class="chat-list-name">${friend.name}</span>
+                        <span class="chat-list-time">${timeDisplay}</span>
+                    </div>
+                    <div class="chat-list-preview">
+                        <span class="chat-list-message ${friend.unread_count > 0 ? 'unread' : ''}">${lastMsg}</span>
+                        ${unreadBadge}
+                    </div>
+                </div>
             `;
             list.appendChild(item);
         });
@@ -760,6 +853,26 @@ async function loadChatFriends() {
     } catch (error) {
         console.error('Error loading chat list:', error);
     }
+}
+
+function formatTimeShort(timestamp) {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now - date;
+
+    // If today, show time
+    if (date.toDateString() === now.toDateString()) {
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    // If yesterday, show 'Yesterday'
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) {
+        return 'Yesterday';
+    }
+    // Otherwise show date
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 function startChat(friendId, friendName) {
