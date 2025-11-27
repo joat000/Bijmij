@@ -515,6 +515,9 @@ def get_friends_list(user_id):
         return jsonify(friends), 200
         
     except Exception as e:
+        print(f"Error in get_friends_list: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/friends/requests/<int:user_id>', methods=['GET'])
@@ -642,6 +645,9 @@ def get_conversation():
         return jsonify(messages), 200
         
     except Exception as e:
+        print(f"Error in get_conversation: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/messages/unread/<int:user_id>', methods=['GET'])

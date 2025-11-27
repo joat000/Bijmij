@@ -47,9 +47,6 @@ function goToDashboard() {
 
     // Connect socket first
     connectSocket();
-
-    // Initialize privacy-first chat
-    initializePrivacyChat();
 }
 
 function goToProfile() {
