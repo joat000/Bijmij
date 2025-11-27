@@ -29,60 +29,16 @@ app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 # Ensure upload directories exist
 os.makedirs(os.path.join(UPLOAD_FOLDER, 'users'), exist_ok=True)
 
-# Import database - supports both SQLite (local) and PostgreSQL (Render)
-import sqlite3
-import os
+# Import unified database module (supports both SQLite and PostgreSQL)
+try:
+    from backend.database_unified import get_db, USE_POSTGRES, IntegrityError
+except ImportError:
+    from database_unified import get_db, USE_POSTGRES, IntegrityError
 
-# Check if we're using PostgreSQL (Render) or SQLite (local)
-DATABASE_URL = os.environ.get('DATABASE_URL')
-
-if DATABASE_URL:
-    # PostgreSQL on Render
+if USE_POSTGRES:
     print("🐘 Using PostgreSQL (Production)")
-    import psycopg2
-    from psycopg2 import pool
-    from contextlib import contextmanager
-    
-    # Fix for Render's postgres:// URL (needs to be postgresql://)
-    if DATABASE_URL.startswith('postgres://'):
-        DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
-    
-    connection_pool = None
-    
-    def init_connection_pool():
-        global connection_pool
-        if connection_pool is None:
-            connection_pool = psycopg2.pool.SimpleConnectionPool(1, 20, DATABASE_URL)
-    
-    def get_db():
-        """Get PostgreSQL connection"""
-        if connection_pool is None:
-            init_connection_pool()
-        return connection_pool.getconn()
-    
-    def close_db(conn):
-        """Return connection to pool"""
-        if connection_pool:
-            connection_pool.putconn(conn)
-    
-    IntegrityError = psycopg2.IntegrityError
-    
 else:
-    # SQLite for local development
     print("🔧 Using SQLite (Development)")
-    
-    def get_db():
-        """Get SQLite database connection"""
-        DATABASE_PATH = os.path.join(os.path.dirname(__file__), '..', 'database.db')
-        conn = sqlite3.connect(DATABASE_PATH)
-        conn.row_factory = sqlite3.Row
-        return conn
-    
-    def close_db(conn):
-        """Close SQLite connection"""
-        conn.close()
-    
-    IntegrityError = sqlite3.IntegrityError
 
 # Initialize database
 try:
