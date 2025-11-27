@@ -231,6 +231,48 @@ def update_user_location(user_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# Public Key Exchange for E2E Encryption
+@app.route('/api/users/<int:user_id>/public-key', methods=['POST'])
+def store_public_key(user_id):
+    """Store user's public encryption key"""
+    try:
+        data = request.get_json()
+        public_key = data.get('public_key')
+        
+        conn = get_db()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET public_key = ? WHERE id = ?
+            ''', (public_key, user_id))
+            conn.commit()
+        finally:
+            conn.close()
+        
+        return jsonify({'message': 'Public key stored'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/users/<int:user_id>/public-key', methods=['GET'])
+def get_public_key(user_id):
+    """Get user's public encryption key"""
+    try:
+        conn = get_db()
+        try:
+            cursor = conn.cursor()
+            cursor.execute('SELECT public_key FROM users WHERE id = ?', (user_id,))
+            user = cursor.fetchone()
+        finally:
+            conn.close()
+        
+        if user and user['public_key']:
+            return jsonify({'public_key': user['public_key']}), 200
+        else:
+            return jsonify({'error': 'Public key not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/users/<int:user_id>/photo', methods=['POST'])
 def upload_user_photo(user_id):
     try:

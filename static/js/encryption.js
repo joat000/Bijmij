@@ -240,6 +240,18 @@ class E2EEncryption {
             return publicKey;
         }
 
+        // Fetch from server
+        try {
+            const response = await fetch(`/api/users/${friendId}/public-key`);
+            if (response.ok) {
+                const data = await response.json();
+                await this.storeFriendPublicKey(friendId, data.public_key);
+                return this.friendPublicKeys.get(friendId);
+            }
+        } catch (error) {
+            console.error('Failed to fetch friend public key:', error);
+        }
+
         return null;
     }
 

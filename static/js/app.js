@@ -954,30 +954,30 @@ window.updateUserMarker = function (userId, lat, lng) {
         const marker = userMarkers[userId];
         const startLatLng = marker.getLatLng();
         const endLatLng = L.latLng(lat, lng);
-        
+
         // Simple animation loop
         const duration = 500; // 500ms animation
         const startTime = performance.now();
-        
+
         function animate(currentTime) {
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            
+
             // Ease out cubic
             const ease = 1 - Math.pow(1 - progress, 3);
-            
+
             const currentLat = startLatLng.lat + (endLatLng.lat - startLatLng.lat) * ease;
             const currentLng = startLatLng.lng + (endLatLng.lng - startLatLng.lng) * ease;
-            
+
             marker.setLatLng([currentLat, currentLng]);
-            
+
             if (progress < 1) {
                 requestAnimationFrame(animate);
             }
         }
-        
+
         requestAnimationFrame(animate);
-        
+
     } else {
         // Create new marker
         const marker = L.marker([lat, lng])
@@ -990,7 +990,7 @@ window.updateUserMarker = function (userId, lat, lng) {
 };
 
 // Social Features
-window.sendWave = function(userId, userName) {
+window.sendWave = function (userId, userName) {
     if (window.socket) {
         window.socket.emit('send_wave', {
             sender_id: currentUser.id,
@@ -1001,7 +1001,7 @@ window.sendWave = function(userId, userName) {
     }
 };
 
-window.sendPing = function(userId, userName) {
+window.sendPing = function (userId, userName) {
     if (window.socket) {
         window.socket.emit('send_ping', {
             sender_id: currentUser.id,
@@ -1112,6 +1112,15 @@ async function initializePrivacyChat() {
         // 1. Initialize encryption
         await window.encryption.initialize(currentUser.id);
         console.log('✅ Encryption initialized');
+
+        // Upload public key to server
+        const publicKeyString = await window.encryption.getPublicKeyString();
+        await fetch(`/api/users/${currentUser.id}/public-key`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ public_key: publicKeyString })
+        });
+        console.log('✅ Public key uploaded to server');
 
         // 2. Initialize IndexedDB
         await window.chatStorage.initialize(currentUser.id);

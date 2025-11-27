@@ -246,6 +246,7 @@ def init_db():
                     latitude DOUBLE PRECISION,
                     longitude DOUBLE PRECISION,
                     last_location_update TIMESTAMP,
+                    public_key TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -383,6 +384,7 @@ def init_db():
                     latitude REAL,
                     longitude REAL,
                     last_location_update TIMESTAMP,
+                    public_key TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
