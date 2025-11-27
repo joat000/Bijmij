@@ -500,7 +500,7 @@ def get_friends_list(user_id):
                 )
                 WHERE (f.user_id = ? OR f.friend_id = ?)
                   AND f.status = 'accepted'
-                ORDER BY COALESCE(last_message_time, '1970-01-01') DESC
+                ORDER BY u.name ASC
             '''
             
             # Params: user_id (x5 for subqueries), user_id (x4 for main query)
