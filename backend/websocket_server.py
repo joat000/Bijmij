@@ -1,15 +1,14 @@
+from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask import request
+import os
+import time
+from database_unified import get_db, update_streak
+
+# This will be initialized from app.py
+socketio = None
 
 # Active users tracking (in-memory for speed)
 active_users = {}  # {user_id: {'socket_id': sid, 'lat': lat, 'lng': lng, 'last_update': timestamp}}
-
-def get_db():
-    """Get database connection with optimizations"""
-    conn = sqlite3.connect(DATABASE_PATH, check_same_thread=False)
-    conn.row_factory = sqlite3.Row
-    # Enable WAL mode for better concurrent access
-    conn.execute('PRAGMA journal_mode=WAL')
-    conn.execute('PRAGMA synchronous=NORMAL')
-    return conn
 
 def init_socketio(app):
     """Initialize SocketIO with the Flask app"""
