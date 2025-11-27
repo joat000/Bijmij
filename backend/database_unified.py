@@ -51,11 +51,10 @@ if USE_POSTGRES:
             # Convert ? to %s for PostgreSQL
             adapted_query = query.replace('?', '%s')
             
-            # Handle INTEGER/BOOLEAN differences
+            # Handle INTEGER/BOOLEAN differences (only for WHERE clauses)
+            # Don't convert DEFAULT values as they may be for INTEGER columns
             adapted_query = adapted_query.replace(' = 1', ' = TRUE')
             adapted_query = adapted_query.replace(' = 0', ' = FALSE')
-            adapted_query = adapted_query.replace('DEFAULT 0', 'DEFAULT FALSE')
-            adapted_query = adapted_query.replace('DEFAULT 1', 'DEFAULT TRUE')
             
             result = self._cursor.execute(adapted_query, params or ())
             
