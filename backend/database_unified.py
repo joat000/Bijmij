@@ -48,13 +48,15 @@ if USE_POSTGRES:
         
         def execute(self, query, params=None):
             """Execute query with automatic parameter conversion"""
+            import re
+            
             # Convert ? to %s for PostgreSQL
             adapted_query = query.replace('?', '%s')
             
-            # Handle INTEGER/BOOLEAN differences (only for WHERE clauses)
-            # Don't convert DEFAULT values as they may be for INTEGER columns
-            adapted_query = adapted_query.replace(' = 1', ' = TRUE')
-            adapted_query = adapted_query.replace(' = 0', ' = FALSE')
+            # Handle INTEGER/BOOLEAN differences (only for actual comparisons)
+            # Use word boundaries to avoid breaking SQL keywords like AND
+            adapted_query = re.sub(r'\b= 1\b', '= TRUE', adapted_query)
+            adapted_query = re.sub(r'\b= 0\b', '= FALSE', adapted_query)
             
             result = self._cursor.execute(adapted_query, params or ())
             
