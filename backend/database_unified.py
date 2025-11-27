@@ -4,6 +4,22 @@ Automatically switches based on DATABASE_URL environment variable
 Provides a unified interface that works with existing SQLite-style code
 """
 import os
+import sqlite3
+import time
+from datetime import datetime, timedelta
+
+# Detect which database to use
+USE_POSTGRES = bool(os.environ.get('DATABASE_URL'))
+
+if USE_POSTGRES:
+    print("[INFO] Using PostgreSQL (Production Mode)")
+    import psycopg2
+    from psycopg2 import pool, extras
+    
+    DATABASE_URL = os.environ.get('DATABASE_URL')
+    connection_pool = None
+    
+    def init_connection_pool():
         """Initialize PostgreSQL connection pool"""
         global connection_pool
         
