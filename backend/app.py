@@ -492,7 +492,7 @@ def get_friends_list(user_id):
                         OR (m.sender_id = ? AND m.receiver_id = u.id)
                      ORDER BY m.created_at DESC LIMIT 1) as last_message_time,
                     (SELECT COUNT(*) FROM messages m 
-                     WHERE m.sender_id = u.id AND m.receiver_id = ? AND (m.is_read = 0 OR m.is_read = FALSE)) as unread_count
+                     WHERE m.sender_id = u.id AND m.receiver_id = ? AND NOT m.is_read) as unread_count
                 FROM friends f
                 JOIN users u ON (
                     (f.user_id = ? AND f.friend_id = u.id) OR
@@ -635,7 +635,7 @@ def get_conversation():
             cursor.execute('''
                 UPDATE messages
                 SET is_read = 1
-                WHERE sender_id = ? AND receiver_id = ? AND (is_read = 0 OR is_read = FALSE)
+                WHERE sender_id = ? AND receiver_id = ? AND NOT is_read
             ''', (friend_id, user_id))
             
             conn.commit()

@@ -89,7 +89,42 @@ class EnhancedChat {
         });
     }
 
-    // ... (setupInputHandlers remains same)
+    /**
+     * Setup input handlers
+     */
+    setupInputHandlers() {
+        const chatInput = document.getElementById('chat-input');
+        if (!chatInput) return;
+
+        // Typing indicator
+        chatInput.addEventListener('input', () => {
+            this.handleTyping();
+        });
+
+        // Enter to send, Shift+Enter for new line
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendMessage();
+            }
+        });
+
+        // Auto-resize textarea
+        chatInput.addEventListener('input', () => {
+            chatInput.style.height = 'auto';
+            chatInput.style.height = Math.min(chatInput.scrollHeight, 150) + 'px';
+        });
+
+        // Image input
+        const imageInput = document.getElementById('chat-image-input');
+        if (imageInput) {
+            imageInput.addEventListener('change', (e) => {
+                if (e.target.files && e.target.files[0]) {
+                    this.handleImageSelection(e.target.files[0]);
+                }
+            });
+        }
+    }
 
     /**
      * Start chat with friend
