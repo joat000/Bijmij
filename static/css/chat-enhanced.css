@@ -49,55 +49,6 @@
 .online-indicator {
     color: var(--brutalist-green);
     font-size: 0.9rem;
-}
-
-.offline-indicator {
-    color: var(--text-secondary);
-    font-size: 0.9rem;
-}
-
-.chat-header-actions {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-}
-
-.voice-call-btn {
-    padding: 10px 20px;
-    background: var(--brutalist-green);
-    color: white;
-    border: 3px solid var(--text-primary);
-    font-weight: bold;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.voice-call-btn:hover {
-    transform: translate(-2px, -2px);
-    box-shadow: 4px 4px 0 var(--text-primary);
-}
-
-.encryption-badge {
-    padding: 8px 15px;
-    background: var(--bg-primary);
-    border: 2px solid var(--brutalist-green);
-    color: var(--brutalist-green);
-    font-size: 0.85rem;
-    font-weight: bold;
-}
-
-/* Chat Messages Area */
-.chat-messages {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-    background: var(--bg-primary);
-    scroll-behavior: smooth;
-}
-
-/* Date Separator */
-.date-separator {
-    text-align: center;
     margin: 20px 0;
     position: relative;
 }
@@ -916,7 +867,7 @@ body.dark-mode .call-modal {
     background: var(--bg-primary);
     border: 3px solid var(--text-primary);
     border-radius: 0;
-    box-shadow: 6px 6px 0 rgba(0,0,0,0.2);
+    box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.2);
     padding: 0;
 }
 
@@ -1012,7 +963,7 @@ body.dark-mode .call-modal {
     border: 3px solid var(--text-primary);
     background-size: cover;
     background-position: center;
-    box-shadow: 2px 2px 0 rgba(0,0,0,0.2);
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
     transition: all 0.3s ease;
 }
 
@@ -1026,7 +977,8 @@ body.dark-mode .call-modal {
     left: 0;
     background: inherit;
     z-index: -1;
-    transform: rotate(45deg); /* Fix rotation for image */
+    transform: rotate(45deg);
+    /* Fix rotation for image */
 }
 
 /* Fix image rotation inside pin */
@@ -1055,7 +1007,7 @@ body.dark-mode .call-modal {
     position: absolute;
     margin: -13px 0 0 -13px;
     animation: pulsate 1s ease-out;
-    animation-iteration-count: infinite; 
+    animation-iteration-count: infinite;
     opacity: 0.0;
     box-shadow: 0 0 1px 2px #00ff00;
     animation-delay: 1.1s;
@@ -1066,9 +1018,11 @@ body.dark-mode .call-modal {
         transform: scale(0.1, 0.1);
         opacity: 0.0;
     }
+
     50% {
         opacity: 1.0;
     }
+
     100% {
         transform: scale(1.2, 1.2);
         opacity: 0.0;

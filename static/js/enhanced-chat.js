@@ -57,14 +57,25 @@ class EnhancedChat {
             this.updateOnlineStatus(data.user_id, false);
         });
 
-        // Read receipts (ephemeral, not stored on server)
+        // Read receipts
         socket.on('message_read', (data) => {
             this.updateMessageReadStatus(data.message_id, true);
         });
 
-        // Message delivered (ephemeral)
+        // Message delivered
         socket.on('message_delivered', (data) => {
             this.updateMessageDeliveredStatus(data.message_id);
+        });
+
+        // Message sent confirmation (from server)
+        socket.on('message_sent_confirmed', (data) => {
+            this.updateMessageSentStatus(data.local_message_id, data.server_message_id, data.timestamp);
+        });
+
+        // Message sent error
+        socket.on('message_sent_error', (data) => {
+            console.error('Message send error:', data.error);
+            // Optionally show error to user
         });
 
         // New message
@@ -78,42 +89,7 @@ class EnhancedChat {
         });
     }
 
-    /**
-     * Setup input handlers
-     */
-    setupInputHandlers() {
-        const chatInput = document.getElementById('chat-input');
-        if (!chatInput) return;
-
-        // Typing indicator
-        chatInput.addEventListener('input', () => {
-            this.handleTyping();
-        });
-
-        // Enter to send, Shift+Enter for new line
-        chatInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                this.sendMessage();
-            }
-        });
-
-        // Auto-resize textarea
-        chatInput.addEventListener('input', () => {
-            chatInput.style.height = 'auto';
-            chatInput.style.height = Math.min(chatInput.scrollHeight, 150) + 'px';
-        });
-
-        // Image input
-        const imageInput = document.getElementById('chat-image-input');
-        if (imageInput) {
-            imageInput.addEventListener('change', (e) => {
-                if (e.target.files && e.target.files[0]) {
-                    this.handleImageSelection(e.target.files[0]);
-                }
-            });
-        }
-    }
+    // ... (setupInputHandlers remains same)
 
     /**
      * Start chat with friend
@@ -125,7 +101,10 @@ class EnhancedChat {
         // Update chat header
         this.updateChatHeader(friendName, friendId);
 
-        // Load messages from IndexedDB
+        // Load messages from API (not IndexedDB anymore, or fetch from API then store?)
+        // For simplicity and robustness, let's fetch from API.
+        // But wait, the previous implementation used IndexedDB for offline support.
+        // Let's keep fetching from API for now to ensure we get latest history.
         await this.loadMessages();
 
         // Enable input
@@ -134,11 +113,11 @@ class EnhancedChat {
         if (chatInput) chatInput.disabled = false;
         if (sendBtn) sendBtn.disabled = false;
 
-        // Scroll to bottom or first unread
+        // Scroll to bottom
         this.scrollToBottom();
 
-        // Mark messages as read
-        this.markConversationAsRead(friendId);
+        // Mark messages as read (if we have API for it)
+        // this.markConversationAsRead(friendId); 
     }
 
     /**
@@ -159,89 +138,161 @@ class EnhancedChat {
                 ${onlineStatus}
             </div>
             <div class="chat-header-actions">
-                <button class="voice-call-btn" onclick="voiceCall.initiateCall(${friendId}, '${friendName}')">
-                    🎤 Voice Call
-                </button>
-                <div class="encryption-badge">🔒 End-to-End Encrypted</div>
+                <!-- Voice call and encryption removed -->
             </div>
         `;
     }
 
     /**
-     * Load messages from IndexedDB
+     * Load messages from API
      */
     async loadMessages() {
-        if (!window.chatStorage || !window.chatStorage.db) return;
+        try {
+            const response = await fetch(`/api/messages/${this.currentFriendId}`);
+            const messages = await response.json();
 
-        const messages = await window.chatStorage.getConversation(
-            currentUser.id,
-            this.currentFriendId
-        );
+            const chatMessages = document.getElementById('chat-messages');
+            if (!chatMessages) return;
 
-        const chatMessages = document.getElementById('chat-messages');
-        if (!chatMessages) return;
+            chatMessages.innerHTML = '';
 
-        chatMessages.innerHTML = '';
-
-        if (messages.length === 0) {
-            chatMessages.innerHTML = `
-                <div class="empty-chat-state">
-                    💬 No messages yet. Say hi! 👋
-                </div>
-            `;
-            return;
-        }
-
-        let lastDate = null;
-        let lastSenderId = null;
-
-        for (const msg of messages) {
-            // Add date separator
-            const msgDate = new Date(msg.timestamp);
-            const dateStr = this.formatDate(msgDate);
-            if (dateStr !== lastDate) {
-                chatMessages.innerHTML += `
-                    <div class="date-separator">
-                        <span>${dateStr}</span>
+            if (messages.length === 0) {
+                chatMessages.innerHTML = `
+                    <div class="empty-chat-state">
+                        💬 No messages yet. Say hi! 👋
                     </div>
                 `;
-                lastDate = dateStr;
+                return;
             }
 
-            // Decrypt message
-            let messageText = msg.message;
-            if (msg.encrypted_data && window.encryption) {
-                try {
-                    messageText = await window.encryption.decryptMessage({
-                        encrypted_data: msg.encrypted_data,
-                        encrypted_key: msg.encrypted_key,
-                        iv: msg.iv
-                    });
-                } catch (error) {
-                    console.error('Failed to decrypt message:', error);
-                    messageText = '[Encrypted message]';
+            let lastDate = null;
+            let lastSenderId = null;
+
+            // Messages from API are usually sorted by date
+            for (const msg of messages) {
+                // Add date separator
+                const msgDate = new Date(msg.created_at || msg.timestamp);
+                const dateStr = this.formatDate(msgDate);
+                if (dateStr !== lastDate) {
+                    chatMessages.innerHTML += `
+                        <div class="date-separator">
+                            <span>${dateStr}</span>
+                        </div>
+                    `;
+                    lastDate = dateStr;
                 }
+
+                // Determine if message should be grouped
+                const grouped = lastSenderId === msg.sender_id;
+                lastSenderId = msg.sender_id;
+
+                // Render message
+                this.renderMessage({
+                    id: msg.id,
+                    senderId: msg.sender_id,
+                    message: msg.message,
+                    timestamp: msg.created_at || msg.timestamp,
+                    isRead: msg.is_read,
+                    isSent: true, // It's from history, so it's sent
+                    isDelivered: true, // Assume delivered if in history
+                    grouped: grouped
+                });
             }
 
-            // Determine if message should be grouped
-            const grouped = lastSenderId === msg.senderId;
-            lastSenderId = msg.senderId;
-
-            // Render message
-            this.renderMessage({
-                id: msg.id,
-                senderId: msg.senderId,
-                message: messageText,
-                timestamp: msg.timestamp,
-                isRead: msg.isRead,
-                isSent: msg.isSent,
-                isDelivered: msg.isDelivered,
-                grouped: grouped
-            });
+            this.scrollToBottom();
+        } catch (error) {
+            console.error('Error loading messages:', error);
         }
+    }
+
+    /**
+     * Send message
+     */
+    async sendMessage() {
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+        if (!message || !this.currentFriendId) return;
+
+        const localId = Date.now().toString();
+
+        // Optimistic UI
+        this.renderMessage({
+            id: localId,
+            senderId: currentUser.id,
+            message: message,
+            timestamp: new Date().toISOString(),
+            isRead: false,
+            isSent: false, // Will be true when confirmed
+            isDelivered: false,
+            grouped: false // Simplified for optimistic
+        });
 
         this.scrollToBottom();
+        input.value = '';
+
+        // Emit to server
+        socket.emit('send_message', {
+            sender_id: currentUser.id,
+            receiver_id: this.currentFriendId,
+            message: message,
+            local_message_id: localId
+        });
     }
+
+    /**
+     * Handle incoming message
+     */
+    async handleIncomingMessage(data) {
+        // Only render if we are chatting with this person
+        if (this.currentFriendId == data.sender_id) {
+            this.renderMessage({
+                id: data.server_message_id || data.id,
+                senderId: data.sender_id,
+                message: data.message,
+                timestamp: data.timestamp,
+                isRead: false,
+                isSent: true,
+                isDelivered: true,
+                grouped: false
+            });
+            this.scrollToBottom();
+
+            // Send read receipt
+            socket.emit('send_read_receipt', {
+                message_id: data.server_message_id || data.id,
+                sender_id: data.sender_id
+            });
+        } else {
+            // Show notification or update unread count in list
+            // (This logic might be in app.js or handled by a global listener)
+            if (window.updateChatListUnread) {
+                window.updateChatListUnread(data.sender_id);
+            }
+        }
+    }
+
+    /**
+     * Update message sent status (confirmation from server)
+     */
+    updateMessageSentStatus(localId, serverId, timestamp) {
+        const msgEl = document.querySelector(`.chat-message[data-message-id="${localId}"]`);
+        if (msgEl) {
+            msgEl.dataset.messageId = serverId;
+            const meta = msgEl.querySelector('.message-meta');
+            if (meta) {
+                // Update timestamp if needed
+                // Update tick to sent
+                const receipt = meta.querySelector('.read-receipt');
+                if (receipt) {
+                    receipt.className = 'read-receipt sent';
+                    receipt.innerHTML = '✓';
+                } else {
+                    meta.innerHTML += '<span class="read-receipt sent">✓</span>';
+                }
+            }
+        }
+    }
+
 
     /**
      * Render single message

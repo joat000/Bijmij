@@ -1216,45 +1216,6 @@ window.onUserOffline = function (userId) {
 
 // ============ PRIVACY-FIRST CHAT INITIALIZATION ============
 
-async function initializePrivacyChat() {
-    if (!currentUser) return;
-
-    try {
-        console.log('🔐 Initializing privacy-first chat...');
-
-        // 1. Initialize encryption
-        await window.encryption.initialize(currentUser.id);
-        console.log('✅ Encryption initialized');
-
-        // Upload public key to server
-        const publicKeyString = await window.encryption.getPublicKeyString();
-        await fetch(`/api/users/${currentUser.id}/public-key`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ public_key: publicKeyString })
-        });
-        console.log('✅ Public key uploaded to server');
-
-        // 2. Initialize IndexedDB
-        await window.chatStorage.initialize(currentUser.id);
-        console.log('✅ Local storage initialized');
-
-        // 3. Initialize enhanced chat
-        window.enhancedChat.initialize();
-        console.log('✅ Enhanced chat initialized');
-
-        // 4. Initialize voice call manager
-        window.voiceCall.initialize();
-        console.log('✅ Voice call manager initialized');
-
-        showToast('🔒 End-to-end encryption enabled', 'success');
-
-    } catch (error) {
-        console.error('Failed to initialize privacy chat:', error);
-        showToast('Warning: Encryption not available', 'error');
-    }
-}
-
 // ============ INITIALIZATION ============
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1270,7 +1231,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('chat-input')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
-            sendMessage();
+            // Use enhanced chat send if available
+            if (window.enhancedChat) {
+                window.enhancedChat.sendMessage();
+            } else {
+                sendMessage();
+            }
         }
     });
 });

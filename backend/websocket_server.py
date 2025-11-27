@@ -204,46 +204,78 @@ def init_socketio(app):
     
     # ============ ENHANCED CHAT FEATURES (Privacy-First) ============
     
-    @socketio.on('send_encrypted_message')
-    def handle_encrypted_message(data):
+    @socketio.on('send_message')
+    def handle_send_message(data):
         """
-        Relay encrypted message (server never sees plaintext)
-        Privacy: Server acts as relay only, no storage
+        Handle plain text message sending
+        Stores in DB and relays to receiver
         """
         sender_id = data.get('sender_id')
         receiver_id = data.get('receiver_id')
-        encrypted_data = data.get('encrypted_data')
-        encrypted_key = data.get('encrypted_key')
-        iv = data.get('iv')
+        message_text = data.get('message')
         local_message_id = data.get('local_message_id')
         
-        # Emit to receiver (ephemeral, RAM only)
-        emit('new_message_realtime', {
-            'sender_id': sender_id,
-            'sender_name': active_users.get(sender_id, {}).get('name', 'Unknown'),
-            'encrypted_data': encrypted_data,
-            'encrypted_key': encrypted_key,
-            'iv': iv,
-            'server_message_id': f'{sender_id}_{receiver_id}_{time.time()}'
-        }, room=f'user_{receiver_id}')
-        
-        # Confirm to sender
-        emit('message_sent_confirmed', {
-            'local_message_id': local_message_id,
-            'success': True
-        })
+        if not all([sender_id, receiver_id, message_text]):
+            return
+            
+        # 1. Store in Database
+        try:
+            conn = get_db()
+            cursor = conn.cursor()
+            
+            # Insert message
+            if hasattr(conn, 'cursor_factory') or os.environ.get('DATABASE_URL'): # Postgres
+                cursor.execute('''
+                    INSERT INTO messages (sender_id, receiver_id, message, is_read)
+                    VALUES (%s, %s, %s, FALSE)
+                    RETURNING id, created_at
+                ''', (sender_id, receiver_id, message_text))
+                row = cursor.fetchone()
+                db_message_id = row['id']
+                created_at = row['created_at']
+            else: # SQLite
+                cursor.execute('''
+                    INSERT INTO messages (sender_id, receiver_id, message, is_read)
+                    VALUES (?, ?, ?, 0)
+                ''', (sender_id, receiver_id, message_text))
+                db_message_id = cursor.lastrowid
+                created_at = datetime.now().isoformat()
+                
+            conn.commit()
+            conn.close()
+            
+            # 2. Emit to receiver
+            emit('new_message_realtime', {
+                'id': db_message_id,
+                'sender_id': sender_id,
+                'sender_name': active_users.get(sender_id, {}).get('name', 'Unknown'),
+                'message': message_text,
+                'timestamp': str(created_at),
+                'server_message_id': db_message_id
+            }, room=f'user_{receiver_id}')
+            
+            # 3. Confirm to sender
+            emit('message_sent_confirmed', {
+                'local_message_id': local_message_id,
+                'server_message_id': db_message_id,
+                'timestamp': str(created_at),
+                'success': True
+            })
+            
+        except Exception as e:
+            print(f"Error sending message: {e}")
+            emit('message_sent_error', {
+                'local_message_id': local_message_id,
+                'error': str(e)
+            })
     
     @socketio.on('typing')
     def handle_typing(data):
-        """
-        Typing indicator (ephemeral, never logged)
-        Privacy: Broadcast only, no storage
-        """
+        """Typing indicator"""
         user_id = data.get('user_id')
         user_name = data.get('user_name')
         receiver_id = data.get('receiver_id')
         
-        # Broadcast to receiver only (ephemeral)
         emit('user_typing', {
             'user_id': user_id,
             'user_name': user_name
@@ -251,10 +283,7 @@ def init_socketio(app):
     
     @socketio.on('stopped_typing')
     def handle_stopped_typing(data):
-        """
-        Stop typing indicator (ephemeral)
-        Privacy: Broadcast only, no storage
-        """
+        """Stop typing indicator"""
         user_id = data.get('user_id')
         receiver_id = data.get('receiver_id')
         
@@ -264,141 +293,53 @@ def init_socketio(app):
     
     @socketio.on('send_read_receipt')
     def handle_read_receipt(data):
-        """
-        Read receipt (ephemeral, never stored on server)
-        Privacy: Broadcast only, no logging
-        """
+        """Read receipt"""
         message_id = data.get('message_id')
         sender_id = data.get('sender_id')
         
-        # Notify sender (ephemeral)
+        # Update DB
+        try:
+            conn = get_db()
+            cursor = conn.cursor()
+            if hasattr(conn, 'cursor_factory') or os.environ.get('DATABASE_URL'): # Postgres
+                cursor.execute('UPDATE messages SET is_read = TRUE WHERE id = %s', (message_id,))
+            else: # SQLite
+                cursor.execute('UPDATE messages SET is_read = 1 WHERE id = ?', (message_id,))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Error updating read receipt: {e}")
+        
+        # Notify sender
         emit('message_read', {
             'message_id': message_id
         }, room=f'user_{sender_id}')
     
-    # ============ VOICE CALL SIGNALING (Zero Server Involvement) ============
-    
-    @socketio.on('initiate_call')
-    def handle_initiate_call(data):
-        """
-        Initiate voice call (signaling only)
-        Privacy: No call logs, no duration tracking
-        """
-        caller_id = data.get('caller_id')
-        caller_name = data.get('caller_name')
-        receiver_id = data.get('receiver_id')
-        
-        print(f'Call initiated: {caller_name} -> User {receiver_id}')
-        
-        # Signal to receiver (ephemeral)
-        emit('incoming_call', {
-            'caller_id': caller_id,
-            'caller_name': caller_name
-        }, room=f'user_{receiver_id}')
-    
-    @socketio.on('accept_call')
-    def handle_accept_call(data):
-        """
-        Accept call (signaling only)
-        Privacy: No logging
-        """
-        caller_id = data.get('caller_id')
-        receiver_id = data.get('receiver_id')
-        
-        print(f'Call accepted: User {receiver_id} accepted call from User {caller_id}')
-        
-        # Notify caller (ephemeral)
-        emit('call_accepted', {
-            'receiver_id': receiver_id
-        }, room=f'user_{caller_id}')
-    
-    @socketio.on('reject_call')
-    def handle_reject_call(data):
-        """
-        Reject call (signaling only)
-        Privacy: No logging
-        """
-        caller_id = data.get('caller_id')
-        receiver_id = data.get('receiver_id')
-        
-        print(f'Call rejected: User {receiver_id} rejected call from User {caller_id}')
-        
-        # Notify caller (ephemeral)
-        emit('call_rejected', {
-            'receiver_id': receiver_id
-        }, room=f'user_{caller_id}')
-    
-    @socketio.on('end_call')
-    def handle_end_call(data):
-        """
-        End call (signaling only)
-        Privacy: No call duration stored
-        """
-        receiver_id = data.get('receiver_id')
-        
-        print(f'Call ended with User {receiver_id}')
-        
-        # Notify other peer (ephemeral)
-        emit('call_ended', {}, room=f'user_{receiver_id}')
-    
-    @socketio.on('webrtc_offer')
-    def handle_webrtc_offer(data):
-        """
-        WebRTC offer (ephemeral signaling)
-        Privacy: Deleted immediately after relay
-        """
-        receiver_id = data.get('receiver_id')
-        offer = data.get('offer')
-        
-        # Relay to receiver (ephemeral)
-        emit('webrtc_offer', {
-            'sender_id': request.sid,
-            'offer': offer
-        }, room=f'user_{receiver_id}')
-    
-    @socketio.on('webrtc_answer')
-    def handle_webrtc_answer(data):
-        """
-        WebRTC answer (ephemeral signaling)
-        Privacy: Deleted immediately after relay
-        """
-        receiver_id = data.get('receiver_id')
-        answer = data.get('answer')
-        
-        # Relay to receiver (ephemeral)
-        emit('webrtc_answer', {
-            'sender_id': request.sid,
-            'answer': answer
-        }, room=f'user_{receiver_id}')
-    
-    @socketio.on('webrtc_ice_candidate')
-    def handle_webrtc_ice_candidate(data):
-        """
-        WebRTC ICE candidate (ephemeral signaling)
-        Privacy: Deleted immediately after relay
-        """
-        receiver_id = data.get('receiver_id')
-        candidate = data.get('candidate')
-        
-        # Relay to receiver (ephemeral)
-        emit('webrtc_ice_candidate', {
-            'sender_id': request.sid,
-            'candidate': candidate
-        }, room=f'user_{receiver_id}')
-    
     @socketio.on('message_delivered')
     def handle_message_delivered(data):
-        """
-        Message delivered receipt (ephemeral)
-        Privacy: Broadcast only, no logging
-        """
+        """Message delivered receipt"""
         message_id = data.get('message_id')
         sender_id = data.get('sender_id')
         
-        # Notify sender (ephemeral)
         emit('message_delivered', {
             'message_id': message_id
         }, room=f'user_{sender_id}')
+    
+    @socketio.on('send_image_chunk')
+    def handle_image_chunk(data):
+        """Relay image chunks"""
+        receiver_id = data.get('receiver_id')
+        # ... (rest of image chunk logic if needed, or simplify to just relay)
+        # Assuming image sending is also plain text (base64) or handled similarly
+        # For now, keeping relay for chunks but we might want to store images too?
+        # The user said "improve it". Storing base64 in DB is bad for performance.
+        # Ideally upload to server and send URL.
+        # But for now, let's keep the chunk relay as it works for small images, 
+        # OR better: The frontend should upload image to /api/users/photo (or a new /api/chat/upload) and send the URL as a message.
+        # However, to minimize changes and risk, I'll keep the chunk relay but maybe we should just treat it as a message type?
+        # The current implementation relays chunks. Let's keep it for now as "removing e2e" doesn't strictly mean "remove image chunks".
+        
+        emit('receive_image_chunk', data, room=f'user_{receiver_id}')
 
     @socketio.on('send_image_chunk')
     def handle_image_chunk(data):
