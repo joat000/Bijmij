@@ -1227,6 +1227,11 @@ document.addEventListener('DOMContentLoaded', () => {
         goToDashboard();
     }
 
+    // Initialize enhanced chat
+    if (window.enhancedChat && window.enhancedChat.initialize) {
+        window.enhancedChat.initialize();
+    }
+
     // Chat enter key
     document.getElementById('chat-input')?.addEventListener('keypress', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {

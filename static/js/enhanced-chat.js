@@ -148,7 +148,16 @@ class EnhancedChat {
      */
     async loadMessages() {
         try {
-            const response = await fetch(`/api/messages/${this.currentFriendId}`);
+            const response = await fetch('/api/messages/conversation', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    user_id: currentUser.id,
+                    friend_id: this.currentFriendId
+                })
+            });
             const messages = await response.json();
 
             const chatMessages = document.getElementById('chat-messages');
@@ -646,73 +655,6 @@ class EnhancedChat {
                     message: fullImage // Pass directly if not encrypted
                 }, true); // isImage flag
             }
-        }
-
-    /**
-     * Override handleIncomingMessage to support direct image data
-     */
-    async handleIncomingMessage(data, isImage = false) {
-            let messageText = '[Encrypted message]';
-
-            if (isImage) {
-                messageText = data.message;
-            } else if (data.encrypted_data && window.encryption) {
-                try {
-                    messageText = await window.encryption.decryptMessage({
-                        encrypted_data: data.encrypted_data,
-                        encrypted_key: data.encrypted_key,
-                        iv: data.iv
-                    });
-                } catch (error) {
-                    console.error('Failed to decrypt message:', error);
-                }
-            }
-
-            // Save to IndexedDB
-            const messageData = {
-                userId: currentUser.id,
-                friendId: data.sender_id,
-                senderId: data.sender_id,
-                receiverId: currentUser.id,
-                message: messageText,
-                timestamp: Date.now(),
-                isRead: false,
-                isSent: true,
-                isDelivered: true
-            };
-
-            const messageId = await window.chatStorage.saveMessage(messageData);
-
-            // If chat is open with this friend, render message
-            if (this.currentFriendId === data.sender_id) {
-                this.renderMessage({
-                    id: messageId,
-                    senderId: data.sender_id,
-                    message: messageText,
-                    timestamp: Date.now(),
-                    isRead: false,
-                    isSent: true,
-                    isDelivered: true,
-                    grouped: false
-                });
-
-                this.scrollToBottom();
-                this.markMessageAsRead(messageId);
-
-                if (!isImage) { // Don't send read receipt for image chunks logic yet
-                    socket.emit('send_read_receipt', {
-                        message_id: data.server_message_id,
-                        sender_id: data.sender_id
-                    });
-                }
-            } else {
-                this.unreadMessages[data.sender_id] = (this.unreadMessages[data.sender_id] || 0) + 1;
-                this.updateChatListUnread(data.sender_id);
-            }
-
-            const audio = document.getElementById('notification-sound');
-            if (audio) audio.play();
-            showToast(`New message from ${data.sender_name || 'Friend'}`, 'info');
         }
 
         escapeHtml(text) {
