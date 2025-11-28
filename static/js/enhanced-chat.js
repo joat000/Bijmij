@@ -38,21 +38,21 @@ class EnhancedChat {
         if (!window.socket) return;
 
         // Typing indicators
-.socket.on('user_typing', (data) => {
+        window.socket.on('user_typing', (data) => {
             this.showTypingIndicator(data.user_id, data.user_name);
         });
 
-.socket.on('user_stopped_typing', (data) => {
+        window.socket.on('user_stopped_typing', (data) => {
             this.hideTypingIndicator(data.user_id);
         });
 
         // Online status
-.socket.on('user_online', (data) => {
+        window.socket.on('user_online', (data) => {
             this.onlineUsers.add(data.user_id);
             this.updateOnlineStatus(data.user_id, true);
         });
 
-.socket.on('user_offline', (data) => {
+        window.socket.on('user_offline', (data) => {
             this.onlineUsers.delete(data.user_id);
             this.updateOnlineStatus(data.user_id, false);
         });

@@ -18,7 +18,52 @@ class LocationManager {
         this.MAX_RECONNECT_ATTEMPTS = 5;
     }
 
-    // ... (connect method remains same)
+    /**
+     * Connect to WebSocket server
+     */
+    async connect(userId) {
+        if (this.socket && this.isConnected) return;
+
+        return new Promise((resolve, reject) => {
+            // Use existing socket if available globally
+            if (window.socket) {
+                this.socket = window.socket;
+                this.isConnected = true;
+                resolve();
+                return;
+            }
+
+            // Otherwise connect
+            this.socket = io();
+
+            this.socket.on('connect', () => {
+                console.log('📍 Location Manager connected');
+                this.isConnected = true;
+                this.reconnectAttempts = 0;
+
+                // Register user for location updates
+                this.socket.emit('register_location', { user_id: userId });
+                resolve();
+            });
+
+            this.socket.on('connect_error', (error) => {
+                console.error('Location socket error:', error);
+                this.isConnected = false;
+                this.reconnectAttempts++;
+                if (this.reconnectAttempts > this.MAX_RECONNECT_ATTEMPTS) {
+                    reject(error);
+                }
+            });
+
+            this.socket.on('disconnect', () => {
+                console.log('Location socket disconnected');
+                this.isConnected = false;
+            });
+
+            // Expose globally
+            window.socket = this.socket;
+        });
+    }
 
     /**
      * Calculate distance between two points in meters
