@@ -1,0 +1,40 @@
+<!-- This section should replace lines 204-210 in index.html -->
+
+<div class="auth-tabs" style="margin-bottom: 30px;">
+    <button class="tab-btn active" onclick="switchFriendsTab('nearby')">Nearby</button>
+    <button class="tab-btn" onclick="switchFriendsTab('requests')">Requests</button>
+    <button class="tab-btn" onclick="switchFriendsTab('list')">My Friends</button>
+    <button class="tab-btn" onclick="switchFriendsTab('chat')">Chats</button>
+</div>
+
+<!-- Nearby Friends View -->
+<div id="friends-nearby-view" class="friends-view active">
+    <!-- Location Controls -->
+    <div style="margin-bottom: 20px; background: var(--bg-secondary); border: var(--border-thick); padding: 15px;">
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+            <button onclick="findNearbyFriends(false)"
+                style="flex: 1; background: var(--text-primary); color: var(--bg-primary); border: 2px solid var(--text-primary); padding: 10px; font-weight: bold; cursor: pointer;">📍
+                Search Nearby</button>
+            <button onclick="findNearbyFriends(true)"
+                style="flex: 1; background: var(--brutalist-green); color: white; border: 2px solid var(--text-primary); padding: 10px; font-weight: bold; cursor: pointer;">🌍
+                Worldwide</button>
+        </div>
+        <div
+            style="display: flex; align-items: center; gap: 10px; border-top: 2px solid var(--text-primary); padding-top: 15px; margin-bottom: 10px;">
+            <label style="font-weight: bold; white-space: nowrap;">🎯 Radius: <span id="radius-value"
+                    style="color: var(--brutalist-green);">50</span>km</label>
+            <input type="range" id="radius-slider" min="5" max="500" value="50" step="5" style="flex: 1;"
+                oninput="updateRadiusDisplay(this.value)" />
+        </div>
+        <p style="text-align: center; margin: 0; color: var(--text-secondary); font-size: 0.9rem; font-weight: bold;"
+            id="search-mode-text">Find users within 50km of your location</p>
+    </div>
+
+    <!-- Map Container -->
+    <div id="friends-map"
+        style="height: 400px; width: 100%; margin-bottom: 20px; border: var(--border-thick); box-shadow: var(--shadow-brutal); display: none;">
+    </div>
+
+    <!-- User Grid -->
+    <div id="nearby-friends-grid" class="businesses-grid"></div>
+</div>
