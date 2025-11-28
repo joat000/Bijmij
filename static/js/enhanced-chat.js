@@ -32,59 +32,59 @@ class EnhancedChat {
     }
 
     /**
-     * Setup Socket.IO listeners
+     * Setup.socket.IO listeners
      */
     setupSocketListeners() {
         if (!window.socket) return;
 
         // Typing indicators
-        socket.on('user_typing', (data) => {
+.socket.on('user_typing', (data) => {
             this.showTypingIndicator(data.user_id, data.user_name);
         });
 
-        socket.on('user_stopped_typing', (data) => {
+.socket.on('user_stopped_typing', (data) => {
             this.hideTypingIndicator(data.user_id);
         });
 
         // Online status
-        socket.on('user_online', (data) => {
+.socket.on('user_online', (data) => {
             this.onlineUsers.add(data.user_id);
             this.updateOnlineStatus(data.user_id, true);
         });
 
-        socket.on('user_offline', (data) => {
+.socket.on('user_offline', (data) => {
             this.onlineUsers.delete(data.user_id);
             this.updateOnlineStatus(data.user_id, false);
         });
 
         // Read receipts
-        socket.on('message_read', (data) => {
+.socket.on('message_read', (data) => {
             this.updateMessageReadStatus(data.message_id, true);
         });
 
         // Message delivered
-        socket.on('message_delivered', (data) => {
+.socket.on('message_delivered', (data) => {
             this.updateMessageDeliveredStatus(data.message_id);
         });
 
         // Message sent confirmation (from server)
-        socket.on('message_sent_confirmed', (data) => {
+.socket.on('message_sent_confirmed', (data) => {
             this.updateMessageSentStatus(data.local_message_id, data.server_message_id, data.timestamp);
         });
 
         // Message sent error
-        socket.on('message_sent_error', (data) => {
+.socket.on('message_sent_error', (data) => {
             console.error('Message send error:', data.error);
             // Optionally show error to user
         });
 
         // New message
-        socket.on('new_message_realtime', async (data) => {
+.socket.on('new_message_realtime', async (data) => {
             await this.handleIncomingMessage(data);
         });
 
         // Image chunks
-        socket.on('receive_image_chunk', async (data) => {
+.socket.on('receive_image_chunk', async (data) => {
             await this.handleImageChunk(data);
         });
     }
@@ -129,30 +129,37 @@ class EnhancedChat {
     /**
      * Start chat with friend
      */
+    /**
+     * Start chat with friend
+     */
     async startChat(friendId, friendName) {
+        // If already chatting with this friend, just focus input
+        if (this.currentFriendId === friendId) {
+            const chatInput = document.getElementById('chat-input');
+            if (chatInput) chatInput.focus();
+            return;
+        }
+
         this.currentFriendId = friendId;
         this.currentFriendName = friendName;
 
         // Update chat header
         this.updateChatHeader(friendName, friendId);
 
-        // Load messages from API (not IndexedDB anymore, or fetch from API then store?)
-        // For simplicity and robustness, let's fetch from API.
-        // But wait, the previous implementation used IndexedDB for offline support.
-        // Let's keep fetching from API for now to ensure we get latest history.
+        // Load messages from API
         await this.loadMessages();
 
         // Enable input
         const chatInput = document.getElementById('chat-input');
         const sendBtn = document.getElementById('send-msg-btn');
-        if (chatInput) chatInput.disabled = false;
+        if (chatInput) {
+            chatInput.disabled = false;
+            chatInput.focus();
+        }
         if (sendBtn) sendBtn.disabled = false;
 
         // Scroll to bottom
         this.scrollToBottom();
-
-        // Mark messages as read (if we have API for it)
-        // this.markConversationAsRead(friendId); 
     }
 
     /**
@@ -182,6 +189,16 @@ class EnhancedChat {
      * Load messages from API
      */
     async loadMessages() {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        // Show loading state
+        chatMessages.innerHTML = `
+            <div class="message-loading">
+                <div class="loading-spinner"></div>
+            </div>
+        `;
+
         try {
             const response = await fetch('/api/messages/conversation', {
                 method: 'POST',
@@ -194,9 +211,6 @@ class EnhancedChat {
                 })
             });
             const messages = await response.json();
-
-            const chatMessages = document.getElementById('chat-messages');
-            if (!chatMessages) return;
 
             chatMessages.innerHTML = '';
 
@@ -246,6 +260,11 @@ class EnhancedChat {
             this.scrollToBottom();
         } catch (error) {
             console.error('Error loading messages:', error);
+            chatMessages.innerHTML = `
+                <div class="empty-chat-state" style="color: var(--brutalist-red);">
+                    ⚠️ Error loading messages.
+                </div>
+            `;
         }
     }
 
@@ -275,7 +294,7 @@ class EnhancedChat {
         input.value = '';
 
         // Emit to server
-        socket.emit('send_message', {
+.socket.emit('send_message', {
             sender_id: currentUser.id,
             receiver_id: this.currentFriendId,
             message: message,
@@ -302,7 +321,7 @@ class EnhancedChat {
             this.scrollToBottom();
 
             // Send read receipt
-            socket.emit('send_read_receipt', {
+.socket.emit('send_read_receipt', {
                 message_id: data.server_message_id || data.id,
                 sender_id: data.sender_id
             });
@@ -387,11 +406,11 @@ class EnhancedChat {
 
     handleTyping() {
         // Send typing event
-        socket.emit('typing', {
-            user_id: currentUser.id,
-            user_name: currentUser.name,
-            receiver_id: this.currentFriendId
-        });
+.socket.emit('typing', {
+        user_id: currentUser.id,
+        user_name: currentUser.name,
+        receiver_id: this.currentFriendId
+    });
 
         // Clear previous timeout
         if (this.typingTimeout) {
@@ -405,10 +424,10 @@ class EnhancedChat {
     }
 
     stopTyping() {
-        socket.emit('stopped_typing', {
-            user_id: currentUser.id,
-            receiver_id: this.currentFriendId
-        });
+.socket.emit('stopped_typing', {
+        user_id: currentUser.id,
+        receiver_id: this.currentFriendId
+    });
     }
 
     showTypingIndicator(userId, userName) {
@@ -651,7 +670,7 @@ class EnhancedChat {
 
         for (let i = 0; i < totalChunks; i++) {
             const chunk = imageData.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-            socket.emit('send_image_chunk', {
+.socket.emit('send_image_chunk', {
                 receiver_id: this.currentFriendId,
                 sender_id: currentUser.id,
                 chunk: chunk,

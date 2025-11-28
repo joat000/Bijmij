@@ -298,13 +298,15 @@ async function enableLocation() {
                 } else if (friendsMap) {
                     // Create your marker
                     const selfMarker = L.marker([location.lat, location.lng], {
-                        icon: L.icon({
-                            iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-                            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-                            iconSize: [25, 41],
-                            iconAnchor: [12, 41],
-                            popupAnchor: [1, -34],
-                            shadowSize: [41, 41]
+                        icon: L.divIcon({
+                            className: 'custom-marker-container',
+                            html: `
+                                <div class="marker-pin red" style="background-image: url('${currentUser.profile_photo || 'https://via.placeholder.com/40'}');"></div>
+                                <div class="marker-pulse"></div>
+                            `,
+                            iconSize: [40, 40],
+                            iconAnchor: [20, 40],
+                            popupAnchor: [0, -40]
                         })
                     })
                         .addTo(friendsMap)
@@ -489,14 +491,16 @@ async function findNearbyFriends(worldwide = false) {
         const users = await response.json();
         grid.innerHTML = '';
 
-        if (users.length === 0) {
-            grid.innerHTML = `<p class="empty-state">${worldwide ? '🌍 No other users found worldwide yet. Be the first!' : '📍 No users found nearby. Try Worldwide mode!'}</p>`;
-            return;
-        }
+        // Filter out friends for the list view (they belong in Friends section)
+        const usersForList = users.filter(u => u.friend_status !== 'accepted');
 
-        // Show count
-        const countText = worldwide ? `Found ${users.length} users worldwide!` : `Found ${users.length} users nearby`;
-        grid.innerHTML = `<p style="text-align:center; font-weight:bold; margin-bottom:20px; color:var(--brutalist-green);">${countText}</p>`;
+        if (usersForList.length === 0) {
+            grid.innerHTML = `<p class="empty-state">${worldwide ? '🌍 No new users found worldwide.' : '📍 No new users found nearby.'}</p>`;
+        } else {
+            // Show count
+            const countText = worldwide ? `Found ${usersForList.length} new users worldwide!` : `Found ${usersForList.length} new users nearby`;
+            grid.innerHTML = `<p style="text-align:center; font-weight:bold; margin-bottom:20px; color:var(--brutalist-green);">${countText}</p>`;
+        }
 
         // Store all marker positions for auto-fit
         const markerBounds = [];
@@ -504,32 +508,17 @@ async function findNearbyFriends(worldwide = false) {
         // Add your position to bounds
         markerBounds.push([currentLocation.lat, currentLocation.lng]);
 
-        users.forEach(user => {
+        // Render list (excluding friends)
+        usersForList.forEach(user => {
             const card = document.createElement('div');
             card.className = 'business-card';
 
             let actionBtn = '';
-            let mapActionBtn = '';
 
-            if (user.friend_status === 'accepted') {
-                actionBtn = `
-                    <div class="action-buttons-row">
-                        <button class="book-btn" onclick="switchFriendsTab('chat'); startChat(${user.id}, '${user.name}')">💬 CHAT</button>
-                        <button class="icon-btn" onclick="sendWave(${user.id}, '${user.name}')" title="Send Wave">👋</button>
-                        <button class="icon-btn" onclick="sendPing(${user.id}, '${user.name}')" title="Send Ping">🔔</button>
-                    </div>`;
-                mapActionBtn = `
-                    <div style="display:flex; gap:5px; margin-top:5px;">
-                        <button onclick="switchFriendsTab('chat'); startChat(${user.id}, '${user.name}')" style="flex:1; background:var(--brutalist-green); color:white; border:2px solid black; padding:5px; cursor:pointer; font-weight:bold;">💬</button>
-                        <button onclick="sendWave(${user.id}, '${user.name}')" style="background:white; color:black; border:2px solid black; padding:5px; cursor:pointer;">👋</button>
-                        <button onclick="sendPing(${user.id}, '${user.name}')" style="background:white; color:black; border:2px solid black; padding:5px; cursor:pointer;">🔔</button>
-                    </div>`;
-            } else if (user.friend_status === 'pending') {
+            if (user.friend_status === 'pending') {
                 actionBtn = `<button class="book-btn" disabled>🕒 PENDING</button>`;
-                mapActionBtn = `<button disabled style="background:gray; color:white; border:2px solid black; padding:5px 10px; margin-top:5px;">🕒 PENDING</button>`;
             } else {
                 actionBtn = `<button class="book-btn" onclick="sendFriendRequest(${user.id})">➕ ADD FRIEND</button>`;
-                mapActionBtn = `<button onclick="sendFriendRequest(${user.id})" style="background:black; color:white; border:2px solid black; padding:5px 10px; cursor:pointer; margin-top:5px; font-weight:bold;">➕ ADD FRIEND</button>`;
             }
 
             // Distance display with flag for worldwide and location status
@@ -556,11 +545,34 @@ async function findNearbyFriends(worldwide = false) {
                 </div>
             `;
             grid.appendChild(card);
+        });
 
+        // Render markers (Include friends on map? User said "dont show frnds under map it should avaialbe in frnd sectiono only". 
+        // This likely means they don't want to see them in the "Nearby" list, but seeing them on the map is usually desired for "Social Hub".
+        // However, if they want them "only" in friend section, maybe I should hide them from map too?
+        // Let's assume map is for everyone, list is for discovery.
+        // But I will stick to the list filtering for now as "under map" is specific.)
+
+        users.forEach(user => {
             // Only add map marker if user has location
             if (user.latitude && user.longitude && user.has_location) {
                 // Add to bounds
                 markerBounds.push([user.latitude, user.longitude]);
+
+                let mapActionBtn = '';
+                if (user.friend_status === 'accepted') {
+                    mapActionBtn = `
+                        <div style="display:flex; gap:5px; margin-top:5px;">
+                            <button onclick="switchFriendsTab('chat'); startChat(${user.id}, '${user.name}')" style="flex:1; background:var(--brutalist-green); color:white; border:2px solid black; padding:5px; cursor:pointer; font-weight:bold;">💬</button>
+                            <button onclick="sendWave(${user.id}, '${user.name}')" style="background:white; color:black; border:2px solid black; padding:5px; cursor:pointer;">👋</button>
+                        </div>`;
+                } else if (user.friend_status === 'pending') {
+                    mapActionBtn = `<button disabled style="background:gray; color:white; border:2px solid black; padding:5px 10px; margin-top:5px;">🕒 PENDING</button>`;
+                } else {
+                    mapActionBtn = `<button onclick="sendFriendRequest(${user.id})" style="background:black; color:white; border:2px solid black; padding:5px 10px; cursor:pointer; margin-top:5px; font-weight:bold;">➕ ADD FRIEND</button>`;
+                }
+
+                let distanceDisplay = (worldwide && user.distance > 100) ? `🌍 ${Math.round(user.distance)} km` : `📍 ${user.distance} km`;
 
                 // Create marker with custom icon
                 const marker = L.marker([user.latitude, user.longitude], {
@@ -588,7 +600,7 @@ async function findNearbyFriends(worldwide = false) {
                                 </div>
                             </div>
                             <div class="mini-profile-body">
-                                <p>📍 ${distanceDisplay}</p>
+                                <p>${distanceDisplay}</p>
                                 <div class="mini-profile-actions">
                                     ${mapActionBtn}
                                 </div>
@@ -1111,16 +1123,7 @@ window.sendWave = function (userId, userName) {
     }
 };
 
-window.sendPing = function (userId, userName) {
-    if (window.socket) {
-        window.socket.emit('send_ping', {
-            sender_id: currentUser.id,
-            sender_name: currentUser.name,
-            receiver_id: userId
-        });
-        showToast(`Pinged ${userName}! 🔔`, 'success');
-    }
-};
+
 
 /**
  * Update user card distance in real-time

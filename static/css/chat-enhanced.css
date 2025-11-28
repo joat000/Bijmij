@@ -213,37 +213,6 @@
 }
 
 .typing-text {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-    font-style: italic;
-}
-
-/* Chat Input Area */
-.chat-input-area {
-    padding: 20px;
-    border-top: var(--border-thick);
-    background: var(--bg-secondary);
-    display: flex;
-    gap: 10px;
-}
-
-.chat-input-area input,
-.chat-input-area textarea {
-    flex: 1;
-    padding: 15px;
-    border: var(--border-thick);
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-family: inherit;
-    font-size: 1rem;
-    resize: none;
-    min-height: 50px;
-    max-height: 150px;
-}
-
-.chat-input-area button {
-    padding: 15px 30px;
-    background: var(--brutalist-green);
     color: white;
     border: 3px solid var(--text-primary);
     font-weight: bold;
@@ -601,7 +570,7 @@ body.dark-mode .message-received .message-content {
     background: #2a2a2a;
     color: white;
 }
-}
+
 
 .reject-btn {
     background: var(--brutalist-red);
