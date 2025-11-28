@@ -12,7 +12,7 @@ backlog = 2048
 # For WebSocket with threading mode, use 1 worker
 # For scaling, use Redis with multiple workers
 workers = 1
-worker_class = 'geventwebsocket.gunicorn.workers.GeventWebSocketWorker'  # Use gevent for WebSocket support
+worker_class = 'gevent' # Use gevent for WebSocket support
 threads = 4  # Handle multiple connections per worker
 worker_connections = 1000
 timeout = 120
