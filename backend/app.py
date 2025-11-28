@@ -631,12 +631,19 @@ def get_conversation():
             
             messages = [dict(row) for row in cursor.fetchall()]
             
-            # Mark messages as read
-            cursor.execute('''
-                UPDATE messages
-                SET is_read = 1
-                WHERE sender_id = ? AND receiver_id = ? AND NOT is_read
-            ''', (friend_id, user_id))
+            # Mark messages as read (PostgreSQL compatible)
+            if USE_POSTGRES:
+                cursor.execute('''
+                    UPDATE messages
+                    SET is_read = TRUE
+                    WHERE sender_id = ? AND receiver_id = ? AND is_read = FALSE
+                ''', (friend_id, user_id))
+            else:
+                cursor.execute('''
+                    UPDATE messages
+                    SET is_read = 1
+                    WHERE sender_id = ? AND receiver_id = ? AND NOT is_read
+                ''', (friend_id, user_id))
             
             conn.commit()
         finally:
