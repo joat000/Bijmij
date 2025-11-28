@@ -904,7 +904,7 @@ function startChat(friendId, friendName) {
         loadMessages();
 
         if (chatPollInterval) clearInterval(chatPollInterval);
-        chatPollInterval = setInterval(loadMessages, 1000);
+        chatPollInterval = setInterval(loadMessages, 500);
     }
 }
 
